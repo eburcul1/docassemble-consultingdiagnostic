@@ -1,0 +1,288 @@
+---
+metadata:
+  title: lollipop_chart.yml
+---
+id: generate_lollipop_plot_simple
+code: |
+  # Generate lollipop plot with THREAD-SAFE matplotlib handling
+  
+  # Ensure level mapping configuration is loaded
+  need('formatting_config')
+  
+  if not defined('lollipop_plot_generated') or not lollipop_plot_generated:
+    log("LOLLIPOP PLOT: Starting THREAD-SAFE lollipop plot generation...")
+    
+    # Ensure individual scores are calculated first
+    need('calculate_individual_scores')
+    
+    # Check if we have individual scores data
+    if defined('individual_scores') and individual_scores:
+      log(f"LOLLIPOP PLOT: Using individual_scores with {len(individual_scores)} data points")
+    else:
+      log("LOLLIPOP PLOT: individual_scores not available - creating fallback data")
+      # Create fallback individual_scores from answers if available
+      if defined('answers') and answers and defined('questions') and questions:
+        individual_scores = []
+        
+        # Use the same parsing function that respects level_prefix_style
+        def parse_answer_level_fallback(answer_str, levels):
+          """Parse answer text to get level index (0-4) - fallback version"""
+          if not answer_str or not levels:
+            return 0
+          
+          answer_str = str(answer_str).strip()
+          
+          # Get the current level prefix style from configuration
+          current_style = level_prefix_style
+          
+          # Letter style: "A: description", "B: description", etc.
+          if current_style == "letter" and len(answer_str) >= 2 and answer_str[1] == ':':
+            first_char = answer_str[0].upper()
+            if first_char in ['A', 'B', 'C', 'D', 'E']:
+              level_index = level_mapping.get(first_char, 0)
+              if 0 <= level_index < len(levels):
+                return level_index
+          
+          # Number style: "1: description", "2: description", etc.
+          elif current_style == "number" and len(answer_str) >= 2 and answer_str[1] == ':' and answer_str[0].isdigit():
+            number = int(answer_str[0])
+            if 1 <= number <= 5:  # 1-based numbering
+              level_index = number - 1  # Convert to 0-based
+              if 0 <= level_index < len(levels):
+                return level_index
+          
+          # None style: just the description text (no prefix)
+          elif current_style == "none":
+            # Try exact match first
+            for i, level_text in enumerate(levels):
+              if level_text and level_text.strip().lower() == answer_str.lower():
+                return i
+            
+            # Try partial text matching for "none" style
+            for i, level_text in enumerate(levels):
+              if level_text and level_text.lower() in answer_str.lower():
+                return i
+          
+          # Fallback: try partial text matching for any style
+          for i, level_text in enumerate(levels):
+            if level_text and level_text.lower() in answer_str.lower():
+              return i
+          
+          return 0  # Default to 0 if no match
+        
+        for i, answer in enumerate(answers, 1):
+          if answer:
+            # Parse user level using the same logic as calculate_individual_scores
+            if i-1 < len(questions):
+              question = questions[i-1]
+              levels = question.get('levels', [])
+              user_level = parse_answer_level_fallback(answer, levels)
+              
+              # Get industry norm score from question
+              industry_level = float(question.get('IndustryNormScore', 2.0))
+              
+              individual_scores.append({
+                'question_label': f'Q{i}: {question.get("prompt", question.get("Prompt", "Question"))[:30]}...',
+                'user_level': user_level,
+                'industry_level': industry_level,
+                'category': question.get('category', question.get('AssessmentCategory', 'General'))
+              })
+            else:
+              # Fallback for missing question data
+              individual_scores.append({
+                'question_label': f'Q{i}',
+                'user_level': 0,
+                'industry_level': 2.0
+              })
+          else:
+            # Default for unanswered questions
+            industry_level = 2.0
+            if i-1 < len(questions):
+              question = questions[i-1]
+              if 'IndustryNormScore' in question:
+                industry_level = float(question['IndustryNormScore'])
+            
+            individual_scores.append({
+              'question_label': f'Q{i}',
+              'user_level': 0,
+              'industry_level': industry_level
+            })
+        
+        log(f"LOLLIPOP PLOT: Created fallback individual_scores with {len(individual_scores)} items")
+      else:
+        log("LOLLIPOP PLOT: No answers or questions available - cannot create plot")
+        # Create placeholder instead of returning
+        lollipop_plot = DAFile('lollipop_plot_placeholder')
+        lollipop_plot.initialize(filename='lollipop_plot_placeholder.txt')
+        lollipop_plot.write(b'Lollipop plot data not available - no answers or questions', binary=True)
+        lollipop_plot.commit()
+        lollipop_plot_generated = True
+    
+    try:
+      # THREAD-SAFE matplotlib import and configuration
+      import matplotlib
+      matplotlib.use('Agg')  # Use non-interactive backend BEFORE pyplot
+      
+      # Import pyplot after setting backend
+      import matplotlib.pyplot as plt
+      
+      # Clear any existing matplotlib state to prevent threading issues
+      plt.close('all')
+      import numpy as np
+      from docassemble.base.util import DAFile
+      import io
+      
+      # Force matplotlib to use thread-safe settings
+      plt.ioff()  # Turn off interactive mode
+      
+      # Set matplotlib to not use any GUI backend
+      matplotlib.use('Agg', force=True)
+      
+      # Prepare data for lollipop plot - USE LOCAL VARIABLES ONLY
+      questions = []
+      user_scores = []
+      industry_scores = []
+      
+      # Convert individual_scores to plain list if needed
+      scores_list = list(individual_scores) if hasattr(individual_scores, '__iter__') else individual_scores
+      
+      # Show ALL questions for comprehensive analysis
+      for i, score_data in enumerate(scores_list):
+        question_label = score_data['question_label'] if 'question_label' in score_data else f'Q{i+1}'
+        user_level = score_data['user_level'] if 'user_level' in score_data else 0
+        industry_level = score_data['industry_level'] if 'industry_level' in score_data else 0
+        
+        questions.append(question_label)
+        user_scores.append(user_level)
+        industry_scores.append(industry_level)
+      
+      # Optimized dimensions for Word - 10 inches wide at 150 DPI for all questions
+      n_questions = len(questions)
+      question_labels = questions
+      fig_width_inches = 12.0  # Wider to accommodate all questions
+      # Calculate height for all questions
+      calculated_height = n_questions * 0.3 + 3.0  # Smaller spacing for more questions
+      fig_height_inches = max(8.0, calculated_height)  # Minimum 8 inches height
+      
+      # Create figure with explicit cleanup
+      fig, ax = plt.subplots(figsize=(fig_width_inches, fig_height_inches), dpi=150)
+      
+      # Set transparent background
+      fig.patch.set_alpha(0.0)
+      ax.patch.set_alpha(0.0)
+      
+      # Create y positions as simple integer list
+      y_positions = list(range(n_questions))
+      
+      # Plot each point individually
+      points_plotted = 0
+      for i in range(n_questions):
+        try:
+          user_val = float(user_scores[i])
+          industry_val = float(industry_scores[i])
+          y_pos = y_positions[i]
+          
+          # Connect user and industry points with light gray line
+          ax.plot([user_val, industry_val], [y_pos, y_pos], color='lightgray', alpha=0.7, linewidth=2)
+          
+          # Plot user and industry points with new colors
+          ax.scatter(user_val, y_pos, color='lightgrey', s=80, zorder=3, alpha=0.9, label='Your Score' if i == 0 else "")
+          ax.scatter(industry_val, y_pos, color='black', s=80, zorder=3, alpha=0.9, label='Veloquent Observed Norm' if i == 0 else "")
+          
+          points_plotted += 1
+          
+        except Exception as e:
+          continue  # Continue with other points instead of failing completely
+      
+      # Ensure we always return the figure if points were plotted
+      if points_plotted > 0:
+        # Formatting with proper integer handling - BLACK text for visibility
+        ax.set_yticks(y_positions)
+        ax.set_yticklabels(question_labels, fontsize=8, color='black')  # Smaller font for more questions
+        ax.set_xlim(-0.3, 5.3)  # Adjust for 1-5 scale
+        ax.set_xticks([1, 2, 3, 4, 5])
+        ax.set_xticklabels(['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'], fontsize=10, color='black')
+        
+        # Labels and title - BLACK text
+        ax.set_xlabel('Maturity Level', fontsize=12, fontweight='bold', color='black')
+        ax.set_ylabel('Assessment Questions', fontsize=12, fontweight='bold', color='black')
+        ax.set_title('Your Scores vs Industry Norms', fontsize=13, fontweight='bold', pad=20, color='black')
+        
+        # Legend with black text
+        legend = ax.legend(fontsize=10, loc='lower right', frameon=True, fancybox=True, shadow=True, framealpha=0.8)
+        legend.get_frame().set_facecolor('white')
+        legend.get_frame().set_alpha(0.8)
+        for text in legend.get_texts():
+          text.set_color('black')
+        
+        # Grid with dark gray for visibility on transparent background
+        ax.grid(True, axis='x', alpha=0.3, linestyle='--', linewidth=1, color='gray')
+        ax.grid(True, axis='y', alpha=0.2, linestyle=':', linewidth=0.5, color='gray')
+        
+        # Set tick parameters to black
+        ax.tick_params(colors='black')
+        
+        plt.tight_layout(pad=1.0)
+      
+      # Save plot to bytes - THREAD-SAFE
+      img_buffer = io.BytesIO()
+      plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
+      img_buffer.seek(0)
+      
+      # CRITICAL: Close figure and clear matplotlib state immediately
+      plt.close(fig)
+      plt.close('all')
+      
+      # Create DAFile object - THIS HAS .show() METHOD!
+      lollipop_plot = DAFile('lollipop_plot')
+      lollipop_plot.initialize(filename='lollipop_plot.png')
+      plot_data = img_buffer.getvalue()
+      lollipop_plot.write(plot_data, binary=True)
+      lollipop_plot.commit()
+      
+      # Clear the buffer
+      img_buffer.close()
+      
+      # Ensure the file is properly accessible
+      log(f"Lollipop plot file created: {lollipop_plot.filename}, size: {len(plot_data)} bytes")
+      
+      # Verify the file is properly committed and accessible
+      if hasattr(lollipop_plot, 'filename') and lollipop_plot.filename:
+        log(f"Lollipop plot file verified: {lollipop_plot.filename}")
+      else:
+        log("Lollipop plot file not properly committed")
+        
+      # Ensure the show() method is available
+      if hasattr(lollipop_plot, 'show'):
+        log("Lollipop plot show() method verified")
+      else:
+        log("Lollipop plot show() method not available")
+      
+      log(f"LOLLIPOP PLOT: Generated matplotlib lollipop plot with THREAD-SAFE cleanup for {n_questions} questions")
+      lollipop_plot_generated = True
+      
+      # Force garbage collection to clean up any matplotlib objects
+      import gc
+      gc.collect()
+      
+    except Exception as e:
+      log(f"LOLLIPOP PLOT ERROR: {str(e)}")
+      # Fallback: Create DAFile with text content that still has .show() method
+      lollipop_plot = DAFile('lollipop_plot_fallback')
+      lollipop_plot.initialize(filename='lollipop_plot_fallback.txt')
+      lollipop_plot.write(f'Lollipop plot generation failed: {str(e)}'.encode(), binary=True)
+      lollipop_plot.commit()
+      lollipop_plot_generated = True
+    
+    # Ensure we always have lollipop_plot defined
+    if not defined('lollipop_plot'):
+      lollipop_plot = DAFile('lollipop_plot_fallback')
+      lollipop_plot.initialize(filename='lollipop_plot_fallback.txt')
+      lollipop_plot.write(b'Lollipop plot loading failed', binary=True)
+      lollipop_plot.commit()
+      lollipop_plot_generated = True
+  else:
+    log("LOLLIPOP PLOT: Lollipop plot already generated")
+  
+  # Set completion flag
+  generate_lollipop_plot_simple = True

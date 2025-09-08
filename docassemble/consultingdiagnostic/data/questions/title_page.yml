@@ -1,0 +1,101 @@
+---
+# Optional flag to skip the title page. Pass ?skip_title_page=1 in the URL to bypass.
+variable name: skip_title_page
+data: False
+
+
+
+---
+id: title_page
+mandatory: True
+show if: not (defined('skip_title_page') and skip_title_page)
+question: |
+  <div style="text-align: center; margin: 30px 0;">
+    <a id="watch-video"
+       href="#"
+       data-video-url="https://www.youtube.com/watch?v=BBJa32lCaaY&list=RDBBJa32lCaaY&start_radio=1"
+       role="button"
+       style="display:inline-block;"
+    >
+             <img src="${ url_of('logo2.png') }" alt="Veloquent Consulting (click to play intro)" class="brand-logo" style="height: 225px; cursor: pointer;">
+    </a>
+  </div>
+
+subquestion: |
+  This rapid diagnostic will help you understand where your consulting services firm stands across key capabilities and provide actionable insights to improve your business.
+  
+  Interested in learning more? Click the logo for a short video.
+
+  <div class="assessment-card">
+  <p>During the diganostic you'll be asked to:</p>
+  <ul>
+  <li>Provide some basic information about you/your firm</li>
+  <li>Prioritize common industry challenges</li>
+  <li>Respond to 25 statements/questions related to your current practices</li>
+  </ul>
+  <p><strong>Estimated time: 10-15 minutes</strong></p>
+  </div>
+
+  <!-- Lightweight modal for inline video playback -->
+  <div id="video-modal" aria-hidden="true" style="display:none; position: fixed; inset: 0; z-index: 1050;">
+    <div id="video-backdrop" style="position:absolute; inset:0; background: rgba(0,0,0,.6);"></div>
+    <div id="video-dialog" role="dialog" aria-modal="true" aria-label="Intro video"
+         style="position:absolute; left:50%; top:50%; transform: translate(-50%, -50%); background:#fff; border-radius:8px; box-shadow:0 10px 40px rgba(0,0,0,.25); overflow:hidden;">
+      <button id="video-close" type="button" aria-label="Close" title="Close"
+              style="position:absolute; right:8px; top:6px; background:transparent; border:0; font-size:28px; line-height:1; cursor:pointer; z-index:2">×</button>
+      <div style="width: 88vw; max-width: 960px;">
+        <div style="position: relative; width: 100%; padding-top: 56.25%;">
+          <iframe id="video-frame" src="" title="Intro video" frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowfullscreen
+                  style="position:absolute; inset:0; width:100%; height:100%; border:0;"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    function toEmbed(url){
+      try {
+        if (!url) return '';
+        var short = url.match(/https?:\/\/youtu\.be\/([\w-]+)/i);
+        if (short && short[1]) return 'https://www.youtube.com/embed/' + short[1];
+        var params = (url.split('?')[1]||'').split('&');
+        var id = '';
+        for (var i=0;i<params.length;i++){ if (params[i].indexOf('v=')===0){ id = params[i].split('=')[1]; break; } }
+        if (!id){ var m = url.match(/v=([\w-]+)/); if (m) id = m[1]; }
+        return id ? ('https://www.youtube.com/embed/' + id) : '';
+      } catch(e){ return ''; }
+    }
+
+    var btn = document.getElementById('watch-video');
+    var modal = document.getElementById('video-modal');
+    var backdrop = document.getElementById('video-backdrop');
+    var closeBtn = document.getElementById('video-close');
+    var frame = document.getElementById('video-frame');
+    if (btn && modal && backdrop && closeBtn && frame){
+      function openModal(){
+        var raw = btn.getAttribute('data-video-url') || btn.getAttribute('href');
+        var embed = toEmbed(raw);
+        if (!embed){ alert('Video URL is invalid.'); return; }
+        frame.src = embed + '?autoplay=1&rel=0';
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+      }
+      function closeModal(){
+        modal.style.display = 'none';
+        frame.src = '';
+        document.body.style.overflow = '';
+      }
+      btn.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); openModal(); return false; });
+      document.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('#watch-video') : null; if (t){ e.preventDefault(); e.stopPropagation(); openModal(); return false; } }, true);
+      closeBtn.addEventListener('click', function(e){ e.preventDefault(); closeModal(); });
+      backdrop.addEventListener('click', function(){ closeModal(); });
+      document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && modal.style.display === 'block') closeModal(); });
+    }
+  })();
+  </script>
+
+continue button field: start_diagnostic
+continue button label: Start Diagnostic

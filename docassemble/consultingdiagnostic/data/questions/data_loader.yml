@@ -1,0 +1,131 @@
+---
+metadata:
+  title: data_loader.yml
+---
+initial: True
+id: read_csv_file
+code: |
+  # Initialize data structures
+  if not defined('questions_loaded'):
+    import csv
+    from docassemble.base.util import path_and_mimetype
+    
+    # Initialize as regular Python lists
+    questions = []
+    categories = []
+    combined = []
+    
+    file_path, _ = path_and_mimetype('FinalQuestionsIDwScore.csv')
+    with open(file_path, encoding='utf-8') as f:
+      # Convert reader to list immediately to avoid pickle issues
+      csv_reader = csv.DictReader(f)
+      reader_data = list(csv_reader)
+      # Don't store the reader object - it can't be pickled
+      del csv_reader
+      
+      for row in reader_data:
+        # levels are maturity levels, improvements are suggested actions to improve to next level 
+        levels = []
+        improvements = []
+        
+        for i in range(5):
+          # Use the correct column names from the CSV
+          maturity_key = f'Maturity{i}'
+          improvement_key = f'Improvement{i}'
+          
+          # FIXED: Get the maturity level text with safe dictionary access
+          maturity_text = row[maturity_key] if maturity_key in row else ''
+          maturity_text = (maturity_text or '').strip()
+          
+          if maturity_text:
+            # Normalize quotes to prevent matching issues
+            maturity_text = maturity_text.replace('"', '"').replace('"', '"').replace(''', "'").replace(''', "'")
+            
+            # Store just the description text - formatting will be applied later in questions.yml
+            levels.append(maturity_text)
+            
+            # FIXED: Get improvement action with safe dictionary access
+            improvement = row[improvement_key] if improvement_key in row else ''
+            improvement = (improvement or '').strip()
+            # Normalize quotes in improvement text too
+            improvement = improvement.replace('"', '"').replace('"', '"').replace(''', "'").replace(''', "'") if improvement else ''
+            improvements.append(improvement if improvement else f'No improvement action for Level {i}')
+          else:
+            # Fallback if no maturity text
+            levels.append("")
+            improvements.append(f'No improvement action for Level {i}')
+            
+        # Validate we have the expected 5 levels
+        if len(levels) != 5:
+          # Pad with empty levels if needed
+          while len(levels) < 5:
+            levels.append(f"Level {len(levels)}")
+            improvements.append(f'No improvement action for Level {len(levels)-1}')
+        
+        # FIXED: Create question data structure with safe dictionary access
+        question_data = {
+          'id': row['ID'] if 'ID' in row else '',
+          'category': row['AssessmentCategory'] if 'AssessmentCategory' in row else '',
+          'prompt': row['Prompt'] if 'Prompt' in row else '',
+          'levels': levels,
+          'improvements': improvements,
+          'IndustryNormScore': float(row['IndustryNormScore']) if 'IndustryNormScore' in row and row['IndustryNormScore'] else 0.0
+        }
+        
+        questions.append(question_data)
+        
+        # Add to categories if not already there
+        if question_data['category'] not in categories:
+          categories.append(question_data['category'])
+    
+    questions_loaded = True
+
+# Load offerings data for AI generation
+---
+initial: True
+id: load_offerings_data
+code: |
+  if not defined('offerings_loaded'):
+    import csv
+    from docassemble.base.util import path_and_mimetype
+    
+    # Initialize offerings data structure
+    offerings_csv_data = {}
+    
+    try:
+      file_path, _ = path_and_mimetype('OfferingsDescription.csv')
+      with open(file_path, encoding='utf-8') as f:
+        csv_reader = csv.DictReader(f)
+        reader_data = list(csv_reader)
+        del csv_reader
+        
+        for row in reader_data:
+          offering_id = row['ShortName'] if 'ShortName' in row else row['OfferingName']
+          offerings_csv_data[offering_id] = {
+            'name': row['OfferingName'] if 'OfferingName' in row else '',
+            'Title': row['OfferingName'] if 'OfferingName' in row else '',  # For compatibility
+            'short_name': row['ShortName'] if 'ShortName' in row else '',
+            'description': row['OfferingDescription'] if 'OfferingDescription' in row else '',
+            'Description': row['OfferingDescription'] if 'OfferingDescription' in row else '',  # For compatibility
+            'filename': row['Filename'] if 'Filename' in row else ''
+          }
+      
+      offerings_loaded = True
+      
+    except Exception as e:
+      # Set empty data if file can't be loaded
+      offerings_csv_data = {}
+      offerings_loaded = True  # Still mark as loaded to prevent repeated attempts
+
+# Need to continue to questions.yml
+
+---
+question: |
+  CSV Loading Module Test Complete
+subquestion: |
+  This is a test endpoint for the CSV loading module.
+  
+  The CSV data loading functions have been defined and are ready for use.
+buttons:
+  - Exit: exit
+field: csv_test_complete 

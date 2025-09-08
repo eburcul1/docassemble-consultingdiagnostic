@@ -1,0 +1,438 @@
+---
+id: main_assessment_flow
+mandatory: True
+code: |
+  # MAIN ASSESSMENT FLOW - Day 6 Complete System
+  # This runs AFTER user information is collected
+  
+  # Ensure level mapping configuration is loaded
+  need('formatting_config')
+  
+  # FIRST: Ensure user information is collected (this will trigger the mandatory user question)
+  if not defined('user_info_collected') or not user_info_collected:
+    # Don't proceed until user info is collected
+    log("⏸️ Waiting for user information collection...")
+    # This will stop execution here and wait for user_info_collected to be True
+    user_info_collected
+
+  # Provide a safe default for AI processing status to avoid dependency loops
+  if not defined('ai_processing_complete'):
+    ai_processing_complete = False
+
+  # Do not predefine feedback_provided; it must be undefined to trigger the feedback question when needed
+
+  # Unified proceed flag used across flow control
+  any_proceed = (defined('proceeded_to_results') and proceeded_to_results) or \
+                (defined('proceed_to_results') and proceed_to_results)
+
+  # HARD SHORT-CIRCUIT: if user has proceeded to results, clear any pending
+  # question/feedback state and immediately show results. This prevents detours
+  # into category feedback or re-entry into questions/processing.
+  if (defined('proceeded_to_results') and proceeded_to_results) or (defined('proceed_to_results') and proceed_to_results):
+    try:
+      if defined('need_category_feedback'):
+        del need_category_feedback
+      feedback_provided = True
+      if defined('category_feedback'):
+        category_feedback = {}
+    except Exception:
+      pass
+    try:
+      questions_processed = True
+      questions_complete = True
+      if defined('questions'):
+        current_question = len(questions)
+      if defined('current_question_response'):
+        del current_question_response
+    except Exception:
+      pass
+    ready_for_processing = False
+    processing_started = False
+    phase = 'results'
+    need('show_assessment_results')
+
+  # AUTO-ADVANCE SAFETY: if the UI signaled completion, finalize proceed
+  if (defined('ui_progress_done') and ui_progress_done) and not (defined('proceeded_to_results') and proceeded_to_results):
+    try:
+      proceeded_to_results = True
+      processing_complete = True
+      phase = 'results'
+      ready_for_processing = False
+      processing_started = False
+      if defined('need_category_feedback'):
+        del need_category_feedback
+      feedback_provided = True
+      log('✅ Auto-advanced from UI completion signal')
+    except Exception:
+      pass
+    need('show_assessment_results')
+
+  # If user has explicitly proceeded past processing, go straight to results and skip any re-entry
+  # Do NOT auto-jump on processing_complete; user must click Continue on the progress screen
+  if (defined('proceeded_to_results') and proceeded_to_results) or (defined('proceed_to_results') and proceed_to_results):
+    if not defined('post_processing_cleanup_done'):
+      try:
+        ready_for_processing = False
+        processing_started = False
+        processing_complete = True
+        post_processing_cleanup_done = True
+        if defined('need_category_feedback'):
+          del need_category_feedback
+        feedback_provided = True
+        log("➡️ Skipping processing re-entry; going straight to results")
+      except Exception:
+        pass
+    # Immediately navigate to results screen
+    need('show_assessment_results')
+
+  if (defined('proceeded_to_results') and proceeded_to_results) or (defined('proceed_to_results') and proceed_to_results):
+    pass
+  # SECOND: Create user_information object if it doesn't exist
+  if not defined('user_information') or not user_information:
+    if defined('user_first_name') and user_first_name:
+      user_information = DADict('user_information', auto_gather=False)
+      user_information['first_name'] = user_first_name
+      user_information['last_name'] = user_last_name if defined('user_last_name') else ''
+      user_information['surname'] = user_last_name if defined('user_last_name') else ''
+      user_information['company'] = user_company if defined('user_company') else ''
+      user_information['role'] = user_role if defined('user_role') else ''
+      user_information['email'] = user_email if defined('user_email') else ''
+      user_information['industry'] = user_industry if defined('user_industry') else ''
+      user_information.gathered = True
+      
+      # Also set as object attributes for template compatibility
+      user_information.first_name = user_first_name
+      user_information.last_name = user_last_name if defined('user_last_name') else ''
+      user_information.surname = user_last_name if defined('user_last_name') else ''
+      user_information.company = user_company if defined('user_company') else ''
+      user_information.role = user_role if defined('user_role') else ''
+      user_information.email = user_email if defined('user_email') else ''
+      user_information.industry = user_industry if defined('user_industry') else ''
+      
+      log(f"✅ Created user_information: {user_first_name} at {user_company}")
+    else:
+      log("❌ ERROR: User information variables not available!")
+      # This should not happen if user_info_collected is True
+      user_info_collected = False  # Reset to trigger collection again
+  
+  if not defined('assessment_flow_started'):
+    log("🚀 Starting Day 6 Complete Assessment System...")
+    assessment_flow_started = True
+    if not defined('phase'):
+      phase = 'questions'
+    # If the user already clicked proceed, lock phase immediately
+    if defined('proceeded_to_results') and proceeded_to_results:
+      phase = 'results'
+    # Do not reset navigation flags here; they are used to advance to results after processing
+    
+    # Initialize debug tracking
+    if not defined('debug_info'):
+      debug_info = []
+    
+    debug_info.append({
+      'stage': 'initialization',
+      'timestamp': str(today()),
+      'data': 'Assessment system started'
+    })
+  
+  # Step 1: Load questions, pain points, and offering documents
+  if not defined('data_loaded'):
+    need('questions_loaded')
+    need('pain_points_loaded')
+    need('load_offering_document_content')  # Load offering documents
+    data_loaded = True
+    log("✅ Data loaded")
+  
+  # Step 2: Collect pain points
+  if not defined('pain_points_processed'):
+    collect_pain_points_complete
+    pain_points_processed = True
+    log("✅ Pain points collected")
+    
+    # Calculate pain points data immediately after collection
+    need('calculate_pain_points_data')
+    log("✅ Pain points data calculated")
+  
+  # Step 3: Ask all questions but do NOT force feedback from here; let the questions file handle it
+  # Skip re-entering the question flow if we are already ready for processing
+  if (not defined('phase') or phase == 'questions') and not (defined('ready_for_processing') and ready_for_processing) and not defined('questions_processed') and not any_proceed:
+    # If category feedback is pending, gather it BEFORE proceeding
+    if defined('need_category_feedback') and not defined('feedback_provided'):
+      feedback_provided
+    # Enter the question flow (the questions file will raise the feedback screen when needed)
+    questions_complete
+
+    # If feedback is pending, do not mark as processed here; allow the feedback question to render next
+    if defined('need_category_feedback') and not defined('feedback_provided'):
+      log("⏳ Awaiting category feedback; not proceeding to processing yet")
+    elif defined('questions_complete') and questions_complete:
+      # Do not clear category feedback here; let the feedback screen handle it
+      questions_processed = True
+      ready_for_processing = True
+      phase = 'processing'
+      
+      # FORCE IMMEDIATE AI LAUNCH when questions complete
+      if not defined('ai_background_launched'):
+        log("🚀 IMMEDIATE: Launching AI background task as soon as questions complete")
+        try:
+          from docassemble.base.util import background_action
+          
+          # Prepare assessment data for background task
+          assessment_data_for_ai = {
+            'overall_score': overall_score if defined('overall_score') else defaults.get('overall_score', 0),
+            'industry_average': industry_average if defined('industry_average') else industry_averages.get('default', 2.18),
+            'category_averages': category_averages if defined('category_averages') else {},
+            'pain_points': pain_points if defined('pain_points') else []
+          }
+          
+          ai_task = background_action('run_ai_chunks_v2', assessment_data=assessment_data_for_ai)
+          ai_background_launched = True
+          log("✅ IMMEDIATE: AI background task launched with questions completion")
+        except Exception as immediate_err:
+          log(f"❌ IMMEDIATE: Failed to launch AI background task: {immediate_err}")
+      
+      log("✅ Questions completed (feedback handled by questions file)")
+    # Fallback: if index shows we're done but questions_complete hasn't resolved yet
+    elif defined('questions') and defined('current_question') and current_question >= len(questions) and not (defined('need_category_feedback') and not defined('feedback_provided')):
+      questions_processed = True
+      ready_for_processing = True
+      phase = 'processing'
+      
+      # FORCE IMMEDIATE AI LAUNCH when questions complete by index
+      if not defined('ai_background_launched'):
+        log("🚀 IMMEDIATE: Launching AI background task as soon as questions complete (by index)")
+        try:
+          from docassemble.base.util import background_action
+          
+          # Prepare assessment data for background task
+          assessment_data_for_ai = {
+            'overall_score': overall_score if defined('overall_score') else defaults.get('overall_score', 0),
+            'industry_average': industry_average if defined('industry_average') else industry_averages.get('default', 2.18),
+            'category_averages': category_averages if defined('category_averages') else {},
+            'pain_points': pain_points if defined('pain_points') else []
+          }
+          
+          ai_task = background_action('run_ai_chunks_v2', assessment_data=assessment_data_for_ai)
+          ai_background_launched = True
+          log("✅ IMMEDIATE: AI background task launched with questions completion (by index)")
+        except Exception as immediate_err:
+          log(f"❌ IMMEDIATE: Failed to launch AI background task: {immediate_err}")
+      
+      log("✅ Questions completed by index; proceeding to processing")
+  
+  # Step 4: Start processing IMMEDIATELY when ready (all questions + feedback)
+  # Background AI should start as soon as processing phase begins
+  log(f"🔍 PROCESSING CHECK: phase={phase if defined('phase') else 'undefined'}, ready_for_processing={ready_for_processing if defined('ready_for_processing') else 'undefined'}, any_proceed={any_proceed}")
+  log(f"🔍 PROCESSING CHECK: processing_started={processing_started if defined('processing_started') else 'undefined'}")
+  if (defined('phase') and phase == 'processing') and defined('ready_for_processing') and ready_for_processing:
+    log("🚀 Processing assessment immediately...")
+    from docassemble.base.util import background_action
+    # FORCE AI background task launch regardless of processing_started state
+    log(f"🔍 FORCE CHECK: Will launch AI task. processing_started={processing_started if defined('processing_started') else 'undefined'}")
+    
+    # Initialize progress log and processing state machine
+    try:
+      progress_log.clear()
+    except Exception:
+      pass
+    try:
+      progress_log.gathered = True
+    except Exception:
+      pass
+    progress_log.append('Initializing processing…')
+    
+    # Do all synchronous/lightweight work BEFORE background AI
+    try:
+      progress_log.append('Preparing scores…')
+      
+      # CRITICAL: Directly call score calculation functions instead of using need()
+      log("🔍 FORCE: Directly calling score calculation functions...")
+      
+      # Load configuration first to ensure all constants are available
+      need('load_configuration_constants')
+      
+      # Call the score calculation functions directly
+      from docassemble.base.util import get_config
+      
+      # Calculate category averages
+      log("🔍 FORCE: Calculating category averages...")
+      category_averages = {}
+      category_totals = {}
+      category_counts = {}
+      
+      # Process each answer to calculate category averages
+      for i, answer in enumerate(answers, 1):
+        if answer and ':' in answer:
+          # Extract the level using centralized level mapping
+          level_letter = answer.split(':')[0].strip()
+          level = level_mapping.get(level_letter, 0)
+          
+          # Get category for this question
+          category = questions[i-1]['category'] if i <= len(questions) else 'Unknown'
+          
+          if category not in category_totals:
+            category_totals[category] = 0
+            category_counts[category] = 0
+          
+          category_totals[category] += level
+          category_counts[category] += 1
+      
+      # Calculate averages
+      for category in category_totals:
+        if category_counts[category] > 0:
+          category_averages[category] = category_totals[category] / category_counts[category]
+      
+      log(f"🔍 FORCE: Category averages calculated: {category_averages}")
+      
+      # Calculate overall score
+      log("🔍 FORCE: Calculating overall score...")
+      if category_averages:
+        overall_score = sum(category_averages.values()) / len(category_averages)
+      else:
+        overall_score = 0
+      
+      log(f"🔍 FORCE: Overall score calculated: {overall_score}")
+      
+      # Set industry average from configuration
+      industry_average = industry_averages.get('default', 2.18)
+      
+      # Generate individual scores for plots
+      log("🔍 FORCE: Generating individual scores...")
+      individual_scores = []
+      for i, answer in enumerate(answers, 1):
+        if answer and ':' in answer:
+          level_letter = answer.split(':')[0].strip()
+          level = level_mapping.get(level_letter, 0)
+          
+          # Get industry norm score from the question - USE ACTUAL CSV DATA
+          industry_level = 2.0  # Fallback only
+          if defined('questions') and questions and i-1 < len(questions):
+            question = questions[i-1]
+            if 'IndustryNormScore' in question:
+              industry_level = float(question['IndustryNormScore'])
+            else:
+              log(f"⚠️ FLOW: Missing IndustryNormScore for Q{i}")
+          
+          # Create dictionary format for lollipop plot compatibility
+          individual_scores.append({
+            'question_label': f'Q{i}',
+            'user_level': level,
+            'industry_level': industry_level
+          })
+        else:
+          # Get industry norm score from the question - USE ACTUAL CSV DATA
+          industry_level = 2.0  # Fallback only
+          if defined('questions') and questions and i-1 < len(questions):
+            question = questions[i-1]
+            if 'IndustryNormScore' in question:
+              industry_level = float(question['IndustryNormScore'])
+            else:
+              log(f"⚠️ FLOW: Missing IndustryNormScore for Q{i}")
+          
+          individual_scores.append({
+            'question_label': f'Q{i}',
+            'user_level': 0,
+            'industry_level': industry_level
+          })
+      
+      # Define all the calculated variables
+      define('category_averages', category_averages)
+      define('overall_score', overall_score)
+      define('industry_average', industry_average)
+      define('individual_scores', individual_scores)
+      
+      # CRITICAL: Verify individual_scores was created successfully
+      log(f"🔍 FORCE: individual_scores created with {len(individual_scores)} items")
+      log(f"🔍 FORCE: Sample individual_scores: {individual_scores[:2] if individual_scores else 'EMPTY'}")
+      
+      # Generate lollipop plot after scores are calculated
+      log("🔍 FORCE: Generating lollipop plot with calculated scores...")
+      need('generate_lollipop_plot_simple')
+      
+      from datetime import datetime
+      define('assessment_date', datetime.now().strftime('%B %d, %Y'))
+      progress_log.append('Scores ready.')
+      
+      # CRITICAL: Verify scores are actually calculated before proceeding
+      log(f"🔍 FORCE: After score calculation - overall_score: {overall_score if defined('overall_score') else 'UNDEFINED'}")
+      log(f"🔍 FORCE: After score calculation - industry_average: {industry_average if defined('industry_average') else 'UNDEFINED'}")
+      log(f"🔍 FORCE: After score calculation - category_averages: {category_averages if defined('category_averages') else 'UNDEFINED'}")
+      
+    except Exception as e:
+      log(f"⚠️ Score prep error: {e}")
+      progress_log.append(f"Score prep error: {e}")
+    
+    # Prepare assessment data for background task - ONLY after scores are calculated
+    assessment_data_for_ai = {
+      'overall_score': overall_score,
+      'industry_average': industry_average,
+      'category_averages': category_averages,
+      'pain_points': pain_points if defined('pain_points') else []
+    }
+    
+    log(f"🔍 FORCE: Passing assessment data to background task: {assessment_data_for_ai}")
+    
+    # Launch background AI - ALWAYS launch it
+    processing_started = True
+    processing_complete = False
+    log("🚀 FORCE: About to launch background_action('run_ai_chunks_v2')")
+    try:
+      ai_task = background_action('run_ai_chunks_v2', assessment_data=assessment_data_for_ai)
+      log("✅ FORCE: background_action('run_ai_chunks_v2') launched and handle stored in ai_task")
+      background_started = True
+    except Exception as ai_launch_error:
+      log(f"❌ FORCE: Failed to launch background AI task: {ai_launch_error}")
+      processing_started = False
+    # Processing screen will render next due to show-if on phase
+  
+  # While still on the processing phase, poll the background AI task and merge results when ready
+  try:
+    if defined('ai_task') and ai_task.ready():
+      _ai_result = ai_task.get()
+      if isinstance(_ai_result, dict):
+        try:
+          if 'executive_summary' in _ai_result:
+            executive_summary = _ai_result.get('executive_summary')
+            define('executive_summary', executive_summary)
+            log(f"✅ MERGED: executive_summary ({len(executive_summary)} chars)")
+          if 'contradictions_insights' in _ai_result:
+            contradictions_insights = _ai_result.get('contradictions_insights')
+            define('contradictions_insights', contradictions_insights)
+            log(f"✅ MERGED: contradictions_insights ({len(contradictions_insights)} chars)")
+          if 'challenge_questions' in _ai_result:
+            challenge_questions = _ai_result.get('challenge_questions')
+            define('challenge_questions', challenge_questions)
+            log(f"✅ MERGED: challenge_questions ({len(challenge_questions)} chars)")
+          if 'recommended_services' in _ai_result:
+            recommended_services = _ai_result.get('recommended_services')
+            define('recommended_services', recommended_services)
+            log(f"✅ MERGED: recommended_services ({len(recommended_services)} chars)")
+          log("✅ SUCCESS: All AI results merged from background task into session")
+          # Set AI processing complete flag when all results are successfully merged
+          ai_processing_complete = True
+          define('ai_processing_complete', True)
+          log("✅ AI processing complete flag set to True")
+        except Exception as _merge_err:
+          log(f"⚠️ Error merging AI results: {_merge_err}")
+      else:
+        log(f"⚠️ Background task returned non-dict result: {type(_ai_result).__name__}")
+      processing_complete = True
+      log("🎯 processing_complete set True (background task ready)")
+  except Exception as _bg_err:
+    log(f"⚠️ Error checking ai_task readiness: {_bg_err}")
+
+  # Step 4b: If processing has completed in the background, auto-advance to results
+  if (defined('processing_complete') and processing_complete) or (defined('proceeded_to_results') and proceeded_to_results) or (defined('proceeded_to_results') and proceed_to_results):
+    try:
+      proceeded_to_results = True
+      proceed_to_results = True
+      phase = 'results'
+      ready_for_processing = False
+      processing_started = False
+      if defined('need_category_feedback'):
+        del need_category_feedback
+      feedback_provided = True
+      log('✅ Advancing to results (post-processing or user proceed)')
+    except Exception:
+      pass
+    need('show_assessment_results')

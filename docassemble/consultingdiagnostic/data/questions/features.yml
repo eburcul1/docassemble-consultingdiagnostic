@@ -1,0 +1,59 @@
+
+features:
+  css: assessment_styles.css
+  javascript: |
+    // Add a body class for page-specific styling
+    (function(){
+      function hideProcessingContinueUntilReady(){
+        // Only on processing screen: hide native continue until .show-continue appears
+        var qEl = document.querySelector('input[name="_question_name"]');
+        var qVal = qEl && qEl.value ? String(qEl.value) : '';
+        var isProcessing = qVal.indexOf('ID show_processing_status') === 0;
+        if (!isProcessing) return;
+        function findBtn(){
+          return document.querySelector('#daquestioncontinue')
+                 || document.querySelector('form button[type="submit"]')
+                 || document.querySelector('form input[type="submit"]');
+        }
+        function hideBtn(){
+          if (!document.body.classList.contains('show-continue')){
+            var b = findBtn();
+            if (b) b.style.display = 'none';
+          }
+        }
+        hideBtn();
+        var mo = new MutationObserver(function(){ hideBtn(); });
+        mo.observe(document.body, {childList:true,subtree:true,attributes:true,attributeFilter:['class']});
+      }
+
+      function onLoad(){
+        var qEl = document.querySelector('input[name="_question_name"]');
+        var qVal = qEl && qEl.value ? String(qEl.value) : '';
+        if (qVal.indexOf('ID show_assessment_results') === 0) document.body.classList.add('results-screen');
+        if (qVal.indexOf('ID show_processing_status') === 0) document.body.classList.add('processing-screen');
+        hideProcessingContinueUntilReady();
+      }
+
+      document.addEventListener('DOMContentLoaded', onLoad);
+      document.addEventListener('daPageLoad', onLoad);
+
+      // Explicitly hide native top buttons on results screen in case CSS misses
+      function hideResultsButtonsRuntime(){
+        var qEl = document.querySelector('input[name="_question_name"]');
+        var qVal = qEl && qEl.value ? String(qEl.value) : '';
+        if (qVal.indexOf('ID show_assessment_results') !== 0) return;
+        var form = document.getElementById('daform') || document.querySelector('form.daformmultiplechoice');
+        if (!form) return;
+        function hideNow(){
+          var sets = form.querySelectorAll('fieldset.da-button-set, fieldset.da-field-buttons');
+          sets.forEach(function(fs){ fs.style.setProperty('display', 'none', 'important'); });
+        }
+        hideNow();
+        var mo = new MutationObserver(function(){ hideNow(); });
+        mo.observe(form, { childList: true, subtree: true });
+      }
+      document.addEventListener('DOMContentLoaded', hideResultsButtonsRuntime);
+      document.addEventListener('daPageLoad', hideResultsButtonsRuntime);
+    })();
+  logo: |
+    <img src="/packagestatic/docassemble.playground1Aug25Optimization/logo.png" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">

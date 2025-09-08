@@ -1,0 +1,1064 @@
+---
+# AI Generation - Sequential Chunked Processing
+# This file processes AI generation in chunks to avoid timeouts and improve reliability
+
+---
+# CHUNK 1/4: Executive Summary Generation
+id: generate_executive_summary
+variable: executive_summary
+code: |
+  from docassemble.base.util import log, get_config, define
+  log("📋 CHUNK 1/4: Executive Summary Generation - Starting...")
+  log("🔍 DEBUG: This chunk is being executed!")
+  
+  import os
+  import json
+  import time
+  from docassemble.base.util import path_and_mimetype
+  log("✅ CHUNK 1: Imports successful")
+
+  def load_ai_prompts():
+    """Load AI prompts from JSON file"""
+    try:
+      log("📁 Loading AI prompts from file...")
+      
+      # Try multiple possible locations for the file
+      from docassemble.base.util import path_and_mimetype
+      
+      possible_paths = []
+      
+      # Try Docassemble static file path first
+      try:
+        da_path = path_and_mimetype('ai_prompts.json')[0]
+        if da_path:
+          possible_paths.append(da_path)
+      except:
+        pass
+      
+      # Add fallback paths
+      possible_paths.extend([
+        'ai_prompts.json',  # Current directory
+        os.path.join(os.getcwd(), 'ai_prompts.json')  # Absolute path
+      ])
+      
+      file_path = None
+      for path in possible_paths:
+        log(f"🔍 Trying path: {path}")
+        if os.path.exists(path):
+          file_path = path
+          log(f"✅ Found file at: {path}")
+          break
+      
+      if not file_path:
+        raise Exception(f"ai_prompts.json not found in any of the expected locations: {possible_paths}")
+      
+      with open(file_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+      
+      if not config.get('prompts'):
+        raise ValueError("No prompts found in configuration")
+      
+      log(f"✅ AI prompts loaded from: {file_path}")
+      return config
+      
+    except Exception as e:
+      log(f"❌ Failed to load AI prompts: {e}")
+      raise Exception(f"Critical: Cannot load AI prompts configuration: {e}")
+  
+  def build_formatted_data():
+    """Build comprehensive formatted data for AI processing"""
+    log("📊 Building comprehensive formatted data for AI...")
+    
+    formatted_data = "=== PARTICIPANT INFORMATION ===\n"
+    
+    # Add user information
+    if defined('user_information') and user_information:
+      formatted_data += f"Name: {user_information.get('first_name', '')} {user_information.get('last_name', '')}\n"
+      formatted_data += f"Company: {user_information.get('company', 'Not provided')}\n"
+      formatted_data += f"Industry: {user_information.get('industry', 'Not provided')}\n"
+      formatted_data += f"Role: {user_information.get('role', 'Not provided')}\n"
+    
+    formatted_data += "\n=== SCORING DATA ===\n"
+    
+    # Add overall score
+    if defined('overall_score'):
+      formatted_data += f"Overall Score: {overall_score}/4\n"
+    
+    # Add industry average
+    if defined('industry_average'):
+      formatted_data += f"Industry Average: {industry_average}/4\n"
+    
+    # Add category scores
+    if defined('category_scores') and category_scores:
+      formatted_data += "Category Scores:\n"
+      for category, score in category_scores.items():
+        formatted_data += f"  {category}: {score}/4\n"
+    
+    # Add individual scores
+    if defined('individual_scores') and individual_scores:
+      formatted_data += "\nIndividual Question Scores:\n"
+      for i, score in enumerate(individual_scores, 1):
+        formatted_data += f"  Q{i}: {score}/5\n"
+    
+    # Add pain points
+    if defined('user_selected_challenges') and user_selected_challenges:
+      formatted_data += "\n=== SELECTED CHALLENGES ===\n"
+      for challenge_id, is_selected in user_selected_challenges.items():
+        if is_selected and challenge_id != 'none_above':
+          formatted_data += f"  - Challenge {challenge_id}\n"
+    
+    # Add custom challenges
+    if defined('user_information') and user_information:
+      custom_challenges = user_information.get('custom_challenges', '')
+      if custom_challenges:
+        formatted_data += f"\n=== CUSTOM CHALLENGES ===\n{custom_challenges}\n"
+    
+    log(f"✅ Formatted data built: {len(formatted_data)} characters")
+    return formatted_data
+  
+  def get_common_variables():
+    """Get common variables for AI processing"""
+    # Get API key with robust detection
+    api_key = get_config('openai api key')
+    if not api_key:
+      openai_config = get_config('openai')
+      if openai_config and isinstance(openai_config, dict):
+        api_key = openai_config.get('api_key')
+    if not api_key:
+      api_key = os.getenv('OPENAI_API_KEY')
+    
+    return {
+      'api_key': api_key,
+      'model': 'gpt-4o-mini',
+      'max_tokens': 1000,  # Restored to ~1000 tokens
+      'temperature': 0.6
+    }
+  
+  def generate_ai_content_chunk(prompt_key, formatted_data, common_vars):
+    """Generate AI content for a specific chunk"""
+    try:
+      log(f"🔄 Making OpenAI API call for {prompt_key}...")
+      
+      import openai
+      import httpx
+      
+      # Create OpenAI client with comprehensive timeout configuration
+      # Based on Azure OpenAI timeout best practices
+      client = openai.OpenAI(
+        api_key=common_vars['api_key'],
+        timeout=httpx.Timeout(
+          connect=10.0,    # Connection timeout
+          write=60.0,      # Write timeout  
+          read=60.0,       # Read timeout
+          pool=30.0        # Pool timeout
+        ),
+        max_retries=3      # Built-in retry mechanism
+      )
+      log("✅ OpenAI client created with comprehensive timeout config")
+      
+      # Get prompt from configuration
+      config = load_ai_prompts()
+      prompt_config = config['prompts'].get(prompt_key)
+      if not prompt_config:
+        raise ValueError(f"Prompt '{prompt_key}' not found in configuration")
+      
+      # Extract system and user prompts
+      system_prompt = prompt_config.get('system', '')
+      user_prompt = prompt_config.get('user_template', '')
+      
+      # Format user prompt with available data
+      try:
+        formatted_user_prompt = user_prompt.format(
+          formatted_data=formatted_data,
+          role_context="",
+          other_insights="",
+          offerings_context="",
+          company_name=user_information.get('company', 'this organization') if defined('user_information') and user_information else 'this organization',
+          overall_score=overall_score if defined('overall_score') else 'N/A',
+          industry_average=industry_average if defined('industry_average') else 'N/A'
+        )
+      except KeyError as e:
+        log(f"⚠️ Warning: Missing template variable {e}, using raw prompt")
+        formatted_user_prompt = user_prompt
+      
+      # Prepare messages
+      messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": formatted_user_prompt}
+      ]
+      
+      log(f"📝 Model: {common_vars['model']}")
+      log(f"📝 Max tokens: {common_vars['max_tokens']}")
+      log(f"📝 Temperature: {common_vars['temperature']}")
+      
+      # Try streaming first (faster, prevents timeouts)
+      try:
+        log(f"🔄 Attempting streaming for {prompt_key}...")
+        stream_response = client.chat.completions.create(
+          model=common_vars['model'],
+          messages=messages,
+          max_tokens=common_vars['max_tokens'],
+          temperature=common_vars['temperature'],
+          stream=True
+        )
+        
+        # Collect streaming response
+        content_parts = []
+        for chunk in stream_response:
+          if chunk.choices[0].delta.content:
+            content_parts.append(chunk.choices[0].delta.content)
+        
+        content = ''.join(content_parts).strip()
+        log(f"✅ Streaming completed successfully: {len(content)} chars")
+        return content
+        
+      except Exception as stream_error:
+        log(f"⚠️ Streaming failed: {stream_error}, trying non-streaming...")
+        
+        # Fallback to non-streaming with retry logic
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+          try:
+            log(f"🔄 Non-streaming attempt {attempt + 1}/{max_retries + 1} for {prompt_key}")
+            
+            response = client.chat.completions.create(
+              model=common_vars['model'],
+              messages=messages,
+              max_tokens=common_vars['max_tokens'],
+              temperature=common_vars['temperature']
+            )
+            
+            content = response.choices[0].message.content.strip()
+            log(f"✅ Non-streaming API call completed successfully")
+            log(f"✅ {prompt_key}: {len(content)} chars")
+            return content
+            
+          except Exception as e:
+            if attempt < max_retries:
+              log(f"⚠️ Attempt {attempt + 1} failed: {e}")
+              time.sleep(3)  # Longer wait between retries
+              continue
+            else:
+              raise e  # Re-raise if no more retries
+      
+    except Exception as e:
+      log(f"❌ AI generation failed for {prompt_key}: {e}")
+      return f"{prompt_key.replace('_', ' ').title()} generation failed"
+  
+  # Main execution
+  try:
+    # Load prompts and prepare data
+    common_vars = get_common_variables()
+    formatted_data = build_formatted_data()
+    
+    # Check API key
+    if not common_vars['api_key']:
+      raise Exception("OpenAI API key not configured")
+    log("🔑 API Key found: Yes")
+    
+    # Generate executive summary
+    executive_summary = generate_ai_content_chunk('executive_summary', formatted_data, common_vars)
+    
+    # Ensure variable is globally defined for template resolution
+    define('executive_summary', executive_summary)
+    log("✅ CHUNK 1/4: Executive Summary Generated Successfully!")
+    
+  except Exception as e:
+    log(f"❌ Executive summary generation failed: {e}")
+    executive_summary = "Executive summary generation failed"
+
+---
+# CHUNK 2/4: Strategic Insights Generation
+id: generate_contradictions_insights
+variable: contradictions_insights
+code: |
+  from docassemble.base.util import log, get_config, define
+  import os
+  import json
+  import time
+  from docassemble.base.util import path_and_mimetype
+  
+  log("📋 CHUNK 2/4: Strategic Insights Generation - Starting...")
+  log("🔍 DEBUG: This chunk is being executed!")
+  
+  def load_ai_prompts():
+    """Load AI prompts from JSON file"""
+    try:
+      log("📁 Loading AI prompts from file...")
+      
+      # Try multiple possible locations for the file
+      from docassemble.base.util import path_and_mimetype
+      
+      possible_paths = []
+      
+      # Try Docassemble static file path first
+      try:
+        da_path = path_and_mimetype('ai_prompts.json')[0]
+        if da_path:
+          possible_paths.append(da_path)
+      except:
+        pass
+      
+      # Add fallback paths
+      possible_paths.extend([
+        'ai_prompts.json',  # Current directory
+        os.path.join(os.getcwd(), 'ai_prompts.json')  # Absolute path
+      ])
+      
+      file_path = None
+      for path in possible_paths:
+        log(f"🔍 Trying path: {path}")
+        if os.path.exists(path):
+          file_path = path
+          log(f"✅ Found file at: {path}")
+          break
+      
+      if not file_path:
+        raise Exception(f"ai_prompts.json not found in any of the expected locations: {possible_paths}")
+      
+      with open(file_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+      
+      if not config.get('prompts'):
+        raise ValueError("No prompts found in configuration")
+      
+      log(f"✅ AI prompts loaded from: {file_path}")
+      return config
+      
+    except Exception as e:
+      log(f"❌ Failed to load AI prompts: {e}")
+      raise Exception(f"Critical: Cannot load AI prompts configuration: {e}")
+  
+  def build_formatted_data():
+    """Build comprehensive formatted data for AI processing"""
+    log("📊 Building comprehensive formatted data for AI...")
+    
+    formatted_data = "=== PARTICIPANT INFORMATION ===\n"
+    
+    # Add user information
+    if defined('user_information') and user_information:
+      formatted_data += f"Company: {user_information.get('company', 'Not provided')}\n"
+      formatted_data += f"Industry: {user_information.get('industry', 'Not provided')}\n"
+      formatted_data += f"Role: {user_information.get('role', 'Not provided')}\n"
+      formatted_data += f"Experience: {user_information.get('experience', 'Not provided')}\n"
+    
+    formatted_data += "\n=== SCORING DATA ===\n"
+    
+    # Add overall score
+    if defined('overall_score'):
+      formatted_data += f"Overall Score: {overall_score}/5\n"
+    
+    # Add industry average
+    if defined('industry_average'):
+      formatted_data += f"Industry Average: {industry_average}/5\n"
+    
+    # Add category scores
+    if defined('category_scores') and category_scores:
+      formatted_data += "Category Scores:\n"
+      for category, score in category_scores.items():
+        formatted_data += f"  {category}: {score}/5\n"
+    
+    # Add individual scores
+    if defined('individual_scores') and individual_scores:
+      formatted_data += "\nIndividual Question Scores:\n"
+      for i, score in enumerate(individual_scores, 1):
+        formatted_data += f"  Q{i}: {score}/5\n"
+    
+    # Add pain points
+    if defined('user_selected_challenges') and user_selected_challenges:
+      formatted_data += "\n=== SELECTED CHALLENGES ===\n"
+      for challenge_id, is_selected in user_selected_challenges.items():
+        if is_selected and challenge_id != 'none_above':
+          formatted_data += f"  - Challenge {challenge_id}\n"
+    
+    # Add custom challenges
+    if defined('user_information') and user_information:
+      custom_challenges = user_information.get('custom_challenges', '')
+      if custom_challenges:
+        formatted_data += f"\n=== CUSTOM CHALLENGES ===\n{custom_challenges}\n"
+    
+    log(f"✅ Formatted data built: {len(formatted_data)} characters")
+    return formatted_data
+  
+  def get_common_variables():
+    """Get common variables for AI processing"""
+    # Get API key with robust detection
+    api_key = get_config('openai api key')
+    if not api_key:
+      openai_config = get_config('openai')
+      if openai_config and isinstance(openai_config, dict):
+        api_key = openai_config.get('api_key')
+    if not api_key:
+      api_key = os.getenv('OPENAI_API_KEY')
+    
+    return {
+      'api_key': api_key,
+      'model': 'gpt-4o-mini',
+      'max_tokens': 1000,  # Restored to ~1000 tokens
+      'temperature': 0.6
+    }
+  
+  def generate_ai_content_chunk(prompt_key, formatted_data, common_vars):
+    """Generate AI content for a specific chunk"""
+    try:
+      log(f"🔄 Making OpenAI API call for {prompt_key}...")
+      
+      import openai
+      import httpx
+      
+      # Create OpenAI client with comprehensive timeout configuration
+      # Based on Azure OpenAI timeout best practices
+      client = openai.OpenAI(
+        api_key=common_vars['api_key'],
+        timeout=httpx.Timeout(
+          connect=10.0,    # Connection timeout
+          write=60.0,      # Write timeout  
+          read=60.0,       # Read timeout
+          pool=30.0        # Pool timeout
+        ),
+        max_retries=3      # Built-in retry mechanism
+      )
+      log("✅ OpenAI client created with comprehensive timeout config")
+      
+      # Get prompt from configuration
+      config = load_ai_prompts()
+      prompt_config = config['prompts'].get(prompt_key)
+      if not prompt_config:
+        raise ValueError(f"Prompt '{prompt_key}' not found in configuration")
+      
+      # Extract system and user prompts
+      system_prompt = prompt_config.get('system', '')
+      user_prompt = prompt_config.get('user_template', '')
+      
+      # Format user prompt with available data
+      try:
+        formatted_user_prompt = user_prompt.format(
+          formatted_data=formatted_data,
+          role_context="",
+          other_insights="",
+          offerings_context="",
+          company_name=user_information.get('company', 'this organization') if defined('user_information') and user_information else 'this organization',
+          overall_score=overall_score if defined('overall_score') else 'N/A',
+          industry_average=industry_average if defined('industry_average') else 'N/A'
+        )
+      except KeyError as e:
+        log(f"⚠️ Warning: Missing template variable {e}, using raw prompt")
+        formatted_user_prompt = user_prompt
+      
+      # Prepare messages
+      messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": formatted_user_prompt}
+      ]
+      
+      log(f"📝 Model: {common_vars['model']}")
+      log(f"📝 Max tokens: {common_vars['max_tokens']}")
+      log(f"📝 Temperature: {common_vars['temperature']}")
+      
+      # Try streaming first (faster, prevents timeouts)
+      try:
+        log(f"🔄 Attempting streaming for {prompt_key}...")
+        stream_response = client.chat.completions.create(
+          model=common_vars['model'],
+          messages=messages,
+          max_tokens=common_vars['max_tokens'],
+          temperature=common_vars['temperature'],
+          stream=True
+        )
+        
+        # Collect streaming response
+        content_parts = []
+        for chunk in stream_response:
+          if chunk.choices[0].delta.content:
+            content_parts.append(chunk.choices[0].delta.content)
+        
+        content = ''.join(content_parts).strip()
+        log(f"✅ Streaming completed successfully: {len(content)} chars")
+        return content
+        
+      except Exception as stream_error:
+        log(f"⚠️ Streaming failed: {stream_error}, trying non-streaming...")
+        
+        # Fallback to non-streaming with retry logic
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+          try:
+            log(f"🔄 Non-streaming attempt {attempt + 1}/{max_retries + 1} for {prompt_key}")
+            
+            response = client.chat.completions.create(
+              model=common_vars['model'],
+              messages=messages,
+              max_tokens=common_vars['max_tokens'],
+              temperature=common_vars['temperature']
+            )
+            
+            content = response.choices[0].message.content.strip()
+            log(f"✅ Non-streaming API call completed successfully")
+            log(f"✅ {prompt_key}: {len(content)} chars")
+            return content
+            
+          except Exception as e:
+            if attempt < max_retries:
+              log(f"⚠️ Attempt {attempt + 1} failed: {e}")
+              time.sleep(3)  # Longer wait between retries
+              continue
+            else:
+              raise e  # Re-raise if no more retries
+      
+    except Exception as e:
+      log(f"❌ AI generation failed for {prompt_key}: {e}")
+      return f"{prompt_key.replace('_', ' ').title()} generation failed"
+  
+  # Main execution
+  try:
+    # Load prompts and prepare data
+    common_vars = get_common_variables()
+    formatted_data = build_formatted_data()
+    
+    # Check API key
+    if not common_vars['api_key']:
+      raise Exception("OpenAI API key not configured")
+    log("🔑 API Key found: Yes")
+    
+    # Generate strategic insights
+    contradictions_insights = generate_ai_content_chunk('contradictions_insights', formatted_data, common_vars)
+    
+    # Force variable into global scope
+    define('contradictions_insights', contradictions_insights)
+    
+    log("✅ CHUNK 2/4: Strategic Insights Generated Successfully!")
+    
+  except Exception as e:
+    log(f"❌ Strategic insights generation failed: {e}")
+    contradictions_insights = "Strategic insights generation failed"
+    define('contradictions_insights', contradictions_insights)
+
+---
+# CHUNK 3/4: Challenge Questions Generation
+id: generate_challenge_questions
+variable: challenge_questions
+code: |
+  from docassemble.base.util import log, get_config, define
+  import os
+  import json
+  import time
+  from docassemble.base.util import path_and_mimetype
+  
+  log("📋 CHUNK 3/4: Challenge Questions Generation - Starting...")
+  log("🔍 DEBUG: This chunk is being executed!")
+  
+  def load_ai_prompts():
+    """Load AI prompts from JSON file"""
+    try:
+      log("📁 Loading AI prompts from file...")
+      
+      # Try multiple possible locations for the file
+      from docassemble.base.util import path_and_mimetype
+      
+      possible_paths = []
+      
+      # Try Docassemble static file path first
+      try:
+        da_path = path_and_mimetype('ai_prompts.json')[0]
+        if da_path:
+          possible_paths.append(da_path)
+      except:
+        pass
+      
+      # Add fallback paths
+      possible_paths.extend([
+        'ai_prompts.json',  # Current directory
+        os.path.join(os.getcwd(), 'ai_prompts.json')  # Absolute path
+      ])
+      
+      file_path = None
+      for path in possible_paths:
+        log(f"🔍 Trying path: {path}")
+        if os.path.exists(path):
+          file_path = path
+          log(f"✅ Found file at: {path}")
+          break
+      
+      if not file_path:
+        raise Exception(f"ai_prompts.json not found in any of the expected locations: {possible_paths}")
+      
+      with open(file_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+      
+      if not config.get('prompts'):
+        raise ValueError("No prompts found in configuration")
+      
+      log(f"✅ AI prompts loaded from: {file_path}")
+      return config
+      
+    except Exception as e:
+      log(f"❌ Failed to load AI prompts: {e}")
+      raise Exception(f"Critical: Cannot load AI prompts configuration: {e}")
+  
+  def build_formatted_data():
+    """Build comprehensive formatted data for AI processing"""
+    log("📊 Building comprehensive formatted data for AI...")
+    
+    formatted_data = "=== PARTICIPANT INFORMATION ===\n"
+    
+    # Add user information
+    if defined('user_information') and user_information:
+      formatted_data += f"Company: {user_information.get('company', 'Not provided')}\n"
+      formatted_data += f"Industry: {user_information.get('industry', 'Not provided')}\n"
+      formatted_data += f"Role: {user_information.get('role', 'Not provided')}\n"
+      formatted_data += f"Experience: {user_information.get('experience', 'Not provided')}\n"
+    
+    formatted_data += "\n=== SCORING DATA ===\n"
+    
+    # Add overall score
+    if defined('overall_score'):
+      formatted_data += f"Overall Score: {overall_score}/5\n"
+    
+    # Add industry average
+    if defined('industry_average'):
+      formatted_data += f"Industry Average: {industry_average}/5\n"
+    
+    # Add category scores
+    if defined('category_scores') and category_scores:
+      formatted_data += "Category Scores:\n"
+      for category, score in category_scores.items():
+        formatted_data += f"  {category}: {score}/5\n"
+    
+    # Add individual scores
+    if defined('individual_scores') and individual_scores:
+      formatted_data += "\nIndividual Question Scores:\n"
+      for i, score in enumerate(individual_scores, 1):
+        formatted_data += f"  Q{i}: {score}/5\n"
+    
+    # Add pain points
+    if defined('user_selected_challenges') and user_selected_challenges:
+      formatted_data += "\n=== SELECTED CHALLENGES ===\n"
+      for challenge_id, is_selected in user_selected_challenges.items():
+        if is_selected and challenge_id != 'none_above':
+          formatted_data += f"  - Challenge {challenge_id}\n"
+    
+    # Add custom challenges
+    if defined('user_information') and user_information:
+      custom_challenges = user_information.get('custom_challenges', '')
+      if custom_challenges:
+        formatted_data += f"\n=== CUSTOM CHALLENGES ===\n{custom_challenges}\n"
+    
+    log(f"✅ Formatted data built: {len(formatted_data)} characters")
+    return formatted_data
+  
+  def get_common_variables():
+    """Get common variables for AI processing"""
+    # Get API key with robust detection
+    api_key = get_config('openai api key')
+    if not api_key:
+      openai_config = get_config('openai')
+      if openai_config and isinstance(openai_config, dict):
+        api_key = openai_config.get('api_key')
+    if not api_key:
+      api_key = os.getenv('OPENAI_API_KEY')
+    
+    return {
+      'api_key': api_key,
+      'model': 'gpt-4o-mini',
+      'max_tokens': 1000,  # Restored to ~1000 tokens
+      'temperature': 0.6
+    }
+  
+  def generate_ai_content_chunk(prompt_key, formatted_data, common_vars):
+    """Generate AI content for a specific chunk"""
+    try:
+      log(f"🔄 Making OpenAI API call for {prompt_key}...")
+      
+      import openai
+      import httpx
+      
+      # Create OpenAI client with comprehensive timeout configuration
+      # Based on Azure OpenAI timeout best practices
+      client = openai.OpenAI(
+        api_key=common_vars['api_key'],
+        timeout=httpx.Timeout(
+          connect=10.0,    # Connection timeout
+          write=60.0,      # Write timeout  
+          read=60.0,       # Read timeout
+          pool=30.0        # Pool timeout
+        ),
+        max_retries=3      # Built-in retry mechanism
+      )
+      log("✅ OpenAI client created with comprehensive timeout config")
+      
+      # Get prompt from configuration
+      config = load_ai_prompts()
+      prompt_config = config['prompts'].get(prompt_key)
+      if not prompt_config:
+        raise ValueError(f"Prompt '{prompt_key}' not found in configuration")
+      
+      # Extract system and user prompts
+      system_prompt = prompt_config.get('system', '')
+      user_prompt = prompt_config.get('user_template', '')
+      
+      # Format user prompt with available data
+      try:
+        formatted_user_prompt = user_prompt.format(
+          formatted_data=formatted_data,
+          role_context="",
+          other_insights="",
+          offerings_context="",
+          company_name=user_information.get('company', 'this organization') if defined('user_information') and user_information else 'this organization',
+          overall_score=overall_score if defined('overall_score') else 'N/A',
+          industry_average=industry_average if defined('industry_average') else 'N/A'
+        )
+      except KeyError as e:
+        log(f"⚠️ Warning: Missing template variable {e}, using raw prompt")
+        formatted_user_prompt = user_prompt
+      
+      # Prepare messages
+      messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": formatted_user_prompt}
+      ]
+      
+      log(f"📝 Model: {common_vars['model']}")
+      log(f"📝 Max tokens: {common_vars['max_tokens']}")
+      log(f"📝 Temperature: {common_vars['temperature']}")
+      
+      # Try streaming first (faster, prevents timeouts)
+      try:
+        log(f"🔄 Attempting streaming for {prompt_key}...")
+        stream_response = client.chat.completions.create(
+          model=common_vars['model'],
+          messages=messages,
+          max_tokens=common_vars['max_tokens'],
+          temperature=common_vars['temperature'],
+          stream=True
+        )
+        
+        # Collect streaming response
+        content_parts = []
+        for chunk in stream_response:
+          if chunk.choices[0].delta.content:
+            content_parts.append(chunk.choices[0].delta.content)
+        
+        content = ''.join(content_parts).strip()
+        log(f"✅ Streaming completed successfully: {len(content)} chars")
+        return content
+        
+      except Exception as stream_error:
+        log(f"⚠️ Streaming failed: {stream_error}, trying non-streaming...")
+        
+        # Fallback to non-streaming with retry logic
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+          try:
+            log(f"🔄 Non-streaming attempt {attempt + 1}/{max_retries + 1} for {prompt_key}")
+            
+            response = client.chat.completions.create(
+              model=common_vars['model'],
+              messages=messages,
+              max_tokens=common_vars['max_tokens'],
+              temperature=common_vars['temperature']
+            )
+            
+            content = response.choices[0].message.content.strip()
+            log(f"✅ Non-streaming API call completed successfully")
+            log(f"✅ {prompt_key}: {len(content)} chars")
+            return content
+            
+          except Exception as e:
+            if attempt < max_retries:
+              log(f"⚠️ Attempt {attempt + 1} failed: {e}")
+              time.sleep(3)  # Longer wait between retries
+              continue
+            else:
+              raise e  # Re-raise if no more retries
+      
+    except Exception as e:
+      log(f"❌ AI generation failed for {prompt_key}: {e}")
+      return f"{prompt_key.replace('_', ' ').title()} generation failed"
+  
+  # Main execution
+  try:
+    # Load prompts and prepare data
+    common_vars = get_common_variables()
+    formatted_data = build_formatted_data()
+    
+    # Check API key
+    if not common_vars['api_key']:
+      raise Exception("OpenAI API key not configured")
+    log("🔑 API Key found: Yes")
+    
+    # Generate challenge questions
+    challenge_questions = generate_ai_content_chunk('challenge_questions', formatted_data, common_vars)
+    
+    # Ensure variable is globally defined
+    define('challenge_questions', challenge_questions)
+    log("✅ CHUNK 3/4: Challenge Questions Generated Successfully!")
+    
+  except Exception as e:
+    log(f"❌ Challenge questions generation failed: {e}")
+    challenge_questions = "Challenge questions generation failed"
+
+---
+# CHUNK 4/4: Recommended Services Generation
+id: generate_recommended_services
+variable: recommended_services
+code: |
+  from docassemble.base.util import log, get_config, define
+  import os
+  import json
+  import time
+  from docassemble.base.util import path_and_mimetype
+  
+  log("📋 CHUNK 4/4: Recommended Services Generation - Starting...")
+  log("🔍 DEBUG: This chunk is being executed!")
+  
+  def load_ai_prompts():
+    """Load AI prompts from JSON file"""
+    try:
+      log("📁 Loading AI prompts from file...")
+      
+      # Try multiple possible locations for the file
+      from docassemble.base.util import path_and_mimetype
+      
+      possible_paths = []
+      
+      # Try Docassemble static file path first
+      try:
+        da_path = path_and_mimetype('ai_prompts.json')[0]
+        if da_path:
+          possible_paths.append(da_path)
+      except:
+        pass
+      
+      # Add fallback paths
+      possible_paths.extend([
+        'ai_prompts.json',  # Current directory
+        os.path.join(os.getcwd(), 'ai_prompts.json')  # Absolute path
+      ])
+      
+      file_path = None
+      for path in possible_paths:
+        log(f"🔍 Trying path: {path}")
+        if os.path.exists(path):
+          file_path = path
+          log(f"✅ Found file at: {path}")
+          break
+      
+      if not file_path:
+        raise Exception(f"ai_prompts.json not found in any of the expected locations: {possible_paths}")
+      
+      with open(file_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+      
+      if not config.get('prompts'):
+        raise ValueError("No prompts found in configuration")
+      
+      log(f"✅ AI prompts loaded from: {file_path}")
+      return config
+      
+    except Exception as e:
+      log(f"❌ Failed to load AI prompts: {e}")
+      raise Exception(f"Critical: Cannot load AI prompts configuration: {e}")
+  
+  def build_formatted_data():
+    """Build comprehensive formatted data for AI processing"""
+    log("📊 Building comprehensive formatted data for AI...")
+    
+    formatted_data = "=== PARTICIPANT INFORMATION ===\n"
+    
+    # Add user information
+    if defined('user_information') and user_information:
+      formatted_data += f"Company: {user_information.get('company', 'Not provided')}\n"
+      formatted_data += f"Industry: {user_information.get('industry', 'Not provided')}\n"
+      formatted_data += f"Role: {user_information.get('role', 'Not provided')}\n"
+      formatted_data += f"Experience: {user_information.get('experience', 'Not provided')}\n"
+    
+    formatted_data += "\n=== SCORING DATA ===\n"
+    
+    # Add overall score
+    if defined('overall_score'):
+      formatted_data += f"Overall Score: {overall_score}/5\n"
+    
+    # Add industry average
+    if defined('industry_average'):
+      formatted_data += f"Industry Average: {industry_average}/5\n"
+    
+    # Add category scores
+    if defined('category_scores') and category_scores:
+      formatted_data += "Category Scores:\n"
+      for category, score in category_scores.items():
+        formatted_data += f"  {category}: {score}/5\n"
+    
+    # Add individual scores
+    if defined('individual_scores') and individual_scores:
+      formatted_data += "\nIndividual Question Scores:\n"
+      for i, score in enumerate(individual_scores, 1):
+        formatted_data += f"  Q{i}: {score}/5\n"
+    
+    # Add pain points
+    if defined('user_selected_challenges') and user_selected_challenges:
+      formatted_data += "\n=== SELECTED CHALLENGES ===\n"
+      for challenge_id, is_selected in user_selected_challenges.items():
+        if is_selected and challenge_id != 'none_above':
+          formatted_data += f"  - Challenge {challenge_id}\n"
+    
+    # Add custom challenges
+    if defined('user_information') and user_information:
+      custom_challenges = user_information.get('custom_challenges', '')
+      if custom_challenges:
+        formatted_data += f"\n=== CUSTOM CHALLENGES ===\n{custom_challenges}\n"
+    
+    log(f"✅ Formatted data built: {len(formatted_data)} characters")
+    return formatted_data
+  
+  def get_common_variables():
+    """Get common variables for AI processing"""
+    # Get API key with robust detection
+    api_key = get_config('openai api key')
+    if not api_key:
+      openai_config = get_config('openai')
+      if openai_config and isinstance(openai_config, dict):
+        api_key = openai_config.get('api_key')
+    if not api_key:
+      api_key = os.getenv('OPENAI_API_KEY')
+    
+    return {
+      'api_key': api_key,
+      'model': 'gpt-4o-mini',
+      'max_tokens': 1000,  # Restored to ~1000 tokens
+      'temperature': 0.6
+    }
+  
+  def generate_ai_content_chunk(prompt_key, formatted_data, common_vars):
+    """Generate AI content for a specific chunk"""
+    try:
+      log(f"🔄 Making OpenAI API call for {prompt_key}...")
+      
+      import openai
+      import httpx
+      
+      # Create OpenAI client with comprehensive timeout configuration
+      # Based on Azure OpenAI timeout best practices
+      client = openai.OpenAI(
+        api_key=common_vars['api_key'],
+        timeout=httpx.Timeout(
+          connect=10.0,    # Connection timeout
+          write=60.0,      # Write timeout  
+          read=60.0,       # Read timeout
+          pool=30.0        # Pool timeout
+        ),
+        max_retries=3      # Built-in retry mechanism
+      )
+      log("✅ OpenAI client created with comprehensive timeout config")
+      
+      # Get prompt from configuration
+      config = load_ai_prompts()
+      prompt_config = config['prompts'].get(prompt_key)
+      if not prompt_config:
+        raise ValueError(f"Prompt '{prompt_key}' not found in configuration")
+      
+      # Extract system and user prompts
+      system_prompt = prompt_config.get('system', '')
+      user_prompt = prompt_config.get('user_template', '')
+      
+      # Format user prompt with available data
+      try:
+        formatted_user_prompt = user_prompt.format(
+          formatted_data=formatted_data,
+          role_context="",
+          other_insights="",
+          offerings_context="",
+          company_name=user_information.get('company', 'this organization') if defined('user_information') and user_information else 'this organization',
+          overall_score=overall_score if defined('overall_score') else 'N/A',
+          industry_average=industry_average if defined('industry_average') else 'N/A'
+        )
+      except KeyError as e:
+        log(f"⚠️ Warning: Missing template variable {e}, using raw prompt")
+        formatted_user_prompt = user_prompt
+      
+      # Prepare messages
+      messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": formatted_user_prompt}
+      ]
+      
+      log(f"📝 Model: {common_vars['model']}")
+      log(f"📝 Max tokens: {common_vars['max_tokens']}")
+      log(f"📝 Temperature: {common_vars['temperature']}")
+      
+      # Try streaming first (faster, prevents timeouts)
+      try:
+        log(f"🔄 Attempting streaming for {prompt_key}...")
+        stream_response = client.chat.completions.create(
+          model=common_vars['model'],
+          messages=messages,
+          max_tokens=common_vars['max_tokens'],
+          temperature=common_vars['temperature'],
+          stream=True
+        )
+        
+        # Collect streaming response
+        content_parts = []
+        for chunk in stream_response:
+          if chunk.choices[0].delta.content:
+            content_parts.append(chunk.choices[0].delta.content)
+        
+        content = ''.join(content_parts).strip()
+        log(f"✅ Streaming completed successfully: {len(content)} chars")
+        return content
+        
+      except Exception as stream_error:
+        log(f"⚠️ Streaming failed: {stream_error}, trying non-streaming...")
+        
+        # Fallback to non-streaming with retry logic
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+          try:
+            log(f"🔄 Non-streaming attempt {attempt + 1}/{max_retries + 1} for {prompt_key}")
+            
+            response = client.chat.completions.create(
+              model=common_vars['model'],
+              messages=messages,
+              max_tokens=common_vars['max_tokens'],
+              temperature=common_vars['temperature']
+            )
+            
+            content = response.choices[0].message.content.strip()
+            log(f"✅ Non-streaming API call completed successfully")
+            log(f"✅ {prompt_key}: {len(content)} chars")
+            return content
+            
+          except Exception as e:
+            if attempt < max_retries:
+              log(f"⚠️ Attempt {attempt + 1} failed: {e}")
+              time.sleep(3)  # Longer wait between retries
+              continue
+            else:
+              raise e  # Re-raise if no more retries
+      
+    except Exception as e:
+      log(f"❌ AI generation failed for {prompt_key}: {e}")
+      return f"{prompt_key.replace('_', ' ').title()} generation failed"
+  
+  # Main execution
+  try:
+    # Load prompts and prepare data
+    common_vars = get_common_variables()
+    formatted_data = build_formatted_data()
+    
+    # Check API key
+    if not common_vars['api_key']:
+      raise Exception("OpenAI API key not configured")
+    log("🔑 API Key found: Yes")
+    
+    # Generate recommended services
+    recommended_services = generate_ai_content_chunk('recommended_services', formatted_data, common_vars)
+    
+    # Ensure variable is globally defined
+    define('recommended_services', recommended_services)
+    log("✅ CHUNK 4/4: Recommended Services Generated Successfully!")
+    
+  except Exception as e:
+    log(f"❌ Recommended services generation failed: {e}")
+    recommended_services = "Recommended services generation failed"
+
+---

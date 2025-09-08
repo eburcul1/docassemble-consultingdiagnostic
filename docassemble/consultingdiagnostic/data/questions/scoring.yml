@@ -1,0 +1,346 @@
+---
+metadata:
+  title: scoring.yml - Self-Contained Scoring System
+
+---
+id: prepare_final_variables
+code: |
+  log("🔍 SCORING: Preparing final variables...")
+  
+  # Ensure level mapping configuration is loaded
+  need('formatting_config')
+  
+  # Define parse function inline to avoid dependency issues
+  def parse_answer_level(answer_str, levels, style):
+    """Parse answer text to get level index (0-4)"""
+    if not answer_str or not levels:
+      return None
+    
+    answer_str = str(answer_str).strip()
+    
+    # Letter style: "A: description", "B: description", etc.
+    if style == "letter" and len(answer_str) >= 2 and answer_str[1] == ':':
+      first_char = answer_str[0].upper()
+      if first_char in ['A', 'B', 'C', 'D', 'E']:
+        # Use centralized level mapping instead of hardcoded calculation
+        level_index = level_mapping.get(first_char, 0)
+        if 0 <= level_index < len(levels):
+          return level_index
+      
+      # Also try without the colon (in case the answer is just "A", "B", etc.)
+      if len(answer_str) == 1 and answer_str.upper() in ['A', 'B', 'C', 'D', 'E']:
+        level_index = level_mapping.get(answer_str.upper(), 0)
+        if 0 <= level_index < len(levels):
+          return level_index
+    
+    # Number style: "1: description", "2: description", etc.
+    elif style == "number" and len(answer_str) >= 2 and answer_str[1] == ':' and answer_str[0].isdigit():
+      number = int(answer_str[0])
+      if 1 <= number <= 5:  # 1-based numbering
+        level_index = number - 1  # Convert to 0-based
+        if 0 <= level_index < len(levels):
+          return level_index
+    
+    # None style: just the description text (no prefix)
+    elif style == "none":
+      # Try exact match first
+      for i, level_text in enumerate(levels):
+        if level_text and level_text.strip().lower() == answer_str.lower():
+          return i
+      
+      # Try partial text matching for "none" style
+      for i, level_text in enumerate(levels):
+        if level_text and level_text.lower() in answer_str.lower():
+          return i
+    
+    # Fallback: try partial text matching for any style
+    for i, level_text in enumerate(levels):
+      if level_text and level_text.lower() in answer_str.lower():
+        return i
+    
+    return None
+  
+  # Calculate category averages
+  log("🔍 SCORING: Starting category averages calculation...")
+  
+  # Ensure we have all required data
+  if not (defined('categories') and defined('questions') and defined('answers')):
+    log("❌ SCORING: Missing required data")
+    category_averages = {}
+  else:
+    # Use the actual level prefix style from configuration
+    need('formatting_config')
+    style = level_prefix_style
+    
+    log(f"🔍 SCORING: Processing {len(answers)} answers, {len(questions)} questions")
+    
+    # Initialize category tracking
+    category_totals = {}
+    category_counts = {}
+    
+    for category in categories:
+      category_totals[category] = 0
+      category_counts[category] = 0
+    
+    # Process each question and answer
+    for i, question in enumerate(questions):
+      if i < len(answers) and answers[i] is not None:
+        answer = answers[i]
+        category = question.get('category', '')
+        levels = question.get('levels', [])
+        
+        log(f"🔍 Q{i+1}: Processing '{str(answer)[:30]}...' for category '{category}'")
+        
+        if category and levels:
+          level = parse_answer_level(answer, levels, style)
+          log(f"🔍 Q{i+1}: Parsed level = {level}")
+          
+          if level is not None and category in category_totals:
+            category_totals[category] += level
+            category_counts[category] += 1
+            log(f"✅ Q{i+1}: Added level {level} to {category} (total: {category_totals[category]}, count: {category_counts[category]})")
+          else:
+            log(f"❌ Q{i+1}: Failed to process level or category")
+    
+    # Calculate averages
+    category_averages = {}
+    for category in category_totals:
+      if category_counts[category] > 0:
+        category_averages[category] = category_totals[category] / category_counts[category]
+        log(f"✅ {category}: {category_totals[category]}/{category_counts[category]} = {category_averages[category]:.2f}")
+      else:
+        category_averages[category] = 0
+        log(f"⚠️ {category}: No valid answers")
+    
+    log(f"🎯 FINAL category_averages: {category_averages}")
+  
+  # Calculate overall score
+  log("🔍 SCORING: Calculating overall score...")
+  
+  if category_averages:
+    scores = list(category_averages.values())
+    overall_score = sum(scores) / len(scores) if scores else 0
+    log(f"✅ SCORING: Overall score = {overall_score:.2f} from {len(scores)} categories")
+  else:
+    overall_score = 0
+    log("❌ SCORING: No category averages available for overall score")
+  
+  # Calculate industry average
+  log("🔍 SCORING: Calculating industry average...")
+  
+  if defined('questions') and questions:
+    industry_scores = []
+    for q in questions:
+      if 'IndustryNormScore' in q:
+        try:
+          score = float(q['IndustryNormScore'])
+          industry_scores.append(score)
+        except (ValueError, TypeError):
+          pass
+    
+    industry_average = sum(industry_scores) / len(industry_scores) if industry_scores else 0
+    log(f"✅ SCORING: Industry average = {industry_average:.2f} from {len(industry_scores)} questions")
+  else:
+    industry_average = 0
+    log("❌ SCORING: No questions available for industry average")
+  
+  # Set category_scores from category_averages
+  if category_averages:
+    category_scores = dict(category_averages)  # Create a plain dict copy
+    log(f"✅ SCORING: Set category_scores: {category_scores}")
+  else:
+    category_scores = {}
+    log("⚠️ SCORING: No category averages to copy to category_scores")
+  
+  prepare_final_variables = True 
+
+---
+id: calculate_category_averages_dynamic
+code: |
+  log("🔄 REAL SCORING: Starting dynamic category averages calculation...")
+  
+  # This calls the main scoring function in this same file
+  prepare_final_variables
+  
+  # Mark as calculated
+  calculate_category_averages_dynamic = True
+
+---
+id: calculate_overall_score
+code: |
+  log("🔄 REAL SCORING: Starting overall score calculation...")
+  
+  # This is already calculated in prepare_final_variables
+  # But we'll recalculate to be sure
+  if defined('category_averages') and category_averages:
+    scores = list(category_averages.values())
+    overall_score = sum(scores) / len(scores) if scores else 0
+    log(f"✅ REAL SCORING: Overall score = {overall_score:.2f} from {len(scores)} categories")
+  else:
+    overall_score = 0
+    log("❌ REAL SCORING: No category averages available for overall score")
+  
+  # Set the completion variable
+  calculate_overall_score = True
+
+---
+id: calculate_industry_average
+code: |
+  log("🔄 REAL SCORING: Starting industry average calculation...")
+  
+  # This is already calculated in prepare_final_variables
+  # But we'll recalculate to be sure  
+  if defined('questions') and questions:
+    industry_scores = []
+    for q in questions:
+      if 'IndustryNormScore' in q:
+        try:
+          score = float(q['IndustryNormScore'])
+          industry_scores.append(score)
+        except (ValueError, TypeError):
+          pass
+    
+    industry_average = sum(industry_scores) / len(industry_scores) if industry_scores else 0
+    log(f"✅ REAL SCORING: Industry average = {industry_average:.2f} from {len(industry_scores)} questions")
+  else:
+    industry_average = 0
+    log("❌ REAL SCORING: No questions available for industry average")
+  
+  # Set the completion variable
+  calculate_industry_average = True
+
+---
+id: generate_individual_scores
+code: |
+  log("🔄 REAL SCORING: Starting individual scores generation...")
+  
+  # Ensure level mapping configuration is loaded
+  need('formatting_config')
+  
+  # Generate individual_scores for lollipop plot if not already defined
+  if not defined('individual_scores') or not individual_scores or len(individual_scores) == 0:
+    individual_scores = []
+    
+    # ENHANCED CONDITION CHECK - be more explicit about what we need
+    questions_available = defined('questions') and questions and len(questions) > 0
+    answers_available = defined('answers') and answers and len(answers) > 0
+    
+    log(f"✅ REAL SCORING: questions_available: {questions_available}")
+    log(f"✅ REAL SCORING: answers_available: {answers_available}")
+    
+    if questions_available and answers_available:
+      log(f"✅ REAL SCORING: Starting individual_scores generation with {len(questions)} questions and {len(answers)} answers")
+      
+      # Ensure we have at least as many answers as questions
+      min_length = min(len(questions), len(answers))
+      log(f"✅ REAL SCORING: Processing {min_length} question-answer pairs")
+      
+      for i in range(min_length):
+        question = questions[i]
+        answer = answers[i] if i < len(answers) else None
+        
+        if answer is not None and str(answer).strip():
+          # Find the level of the user's answer using inline matching logic
+          user_level = None
+          levels = question.get('levels', [])
+          
+          if answer and levels:
+            try:
+              answer_str = str(answer).strip()
+              
+              # Handle LETTER format: A:, B:, C:, D:, E:
+              if level_prefix_style == "letter" and len(answer_str) >= 2 and answer_str[1] == ':':
+                first_char = answer_str[0].upper()
+                if first_char in ['A', 'B', 'C', 'D', 'E']:
+                  # Use centralized level mapping instead of hardcoded calculation
+                  level_index = level_mapping.get(first_char, 0)
+                  if 0 <= level_index < len(levels):
+                    user_level = level_index
+                
+                # Also try without the colon (in case the answer is just "A", "B", etc.)
+                if user_level is None and len(answer_str) == 1 and answer_str.upper() in ['A', 'B', 'C', 'D', 'E']:
+                  level_index = level_mapping.get(answer_str.upper(), 0)
+                  if 0 <= level_index < len(levels):
+                    user_level = level_index
+              
+              # Handle NUMBER format: 1:, 2:, 3:, 4:, 5:
+              elif level_prefix_style == "number" and len(answer_str) >= 2 and answer_str[1] == ':' and answer_str[0].isdigit():
+                number = int(answer_str[0])
+                if 1 <= number <= 5:  # 1-based numbering
+                  level_index = number - 1  # Convert to 0-based
+                  if 0 <= level_index < len(levels):
+                    user_level = level_index
+              
+              # Handle NONE format: just the description text (no prefix)
+              elif level_prefix_style == "none":
+                # Try exact match first
+                for i, level_text in enumerate(levels):
+                  if level_text and level_text.strip().lower() == answer_str.lower():
+                    user_level = i
+                    break
+                
+                # Try partial text matching for "none" style
+                if user_level is None:
+                  for i, level_text in enumerate(levels):
+                    if level_text and level_text.lower() in answer_str.lower():
+                      user_level = i
+                      break
+              
+              # Try direct index lookup (if answer is exact match)
+              if user_level is None and answer in levels:
+                user_level = levels.index(answer)
+              
+              # Try case-insensitive match
+              if user_level is None:
+                levels_lower = [l.lower() for l in levels]
+                if answer.lower() in levels_lower:
+                  user_level = levels_lower.index(answer.lower())
+              
+            except Exception as e:
+              pass
+              
+          if user_level is None:
+            user_level = 0
+            log(f"⚠️ REAL SCORING: Q{i+1} - Could not match answer '{answer}' to levels, using 0")
+          else:
+            log(f"✅ REAL SCORING: Q{i+1} - Found user_level {user_level} for answer '{answer}'")
+          
+          # Get industry level
+          industry_level = float(question.get('IndustryNormScore', 0))
+          
+          # Create individual score entry
+          individual_scores.append({
+            'question_label': f"Q{i+1}: {question.get('prompt', 'Question')[:60]}...",
+            'user_level': user_level,
+            'industry_level': industry_level,
+            'category': question.get('category', question.get('AssessmentCategory', 'General'))
+          })
+        else:
+          # Add entry even for missing answers to maintain count
+          log(f"⚠️ REAL SCORING: Q{i+1} - No answer found, using default values")
+          individual_scores.append({
+            'question_label': f"Q{i+1}: {question.get('prompt', 'Question')[:60]}...",
+            'user_level': 0,
+            'industry_level': float(question.get('IndustryNormScore', 0)),
+            'category': question.get('category', question.get('AssessmentCategory', 'General'))
+          })
+      
+      log(f"✅ REAL SCORING: Generated {len(individual_scores)} individual scores for lollipop plot")
+    else:
+      log("❌ REAL SCORING: Cannot generate individual_scores - questions or answers not available")
+  else:
+    log(f"✅ REAL SCORING: individual_scores already exists with {len(individual_scores)} entries")
+  
+  # Set the completion variable
+  generate_individual_scores = True
+
+---
+id: calculate_scores_and_averages
+code: |
+  log("🔄 REAL SCORING: Starting scores and averages calculation...")
+  
+  # This calls the main scoring function
+  prepare_final_variables
+  
+  # Mark as calculated
+  calculate_scores_and_averages = True

@@ -1,0 +1,213 @@
+---
+metadata:
+  title: Complete Assessment Questions
+  short title: Assessment Questions
+
+---
+# Set global level style variable that can be accessed everywhere
+initial: True
+id: set_global_level_style
+code: |
+  # Load formatting configuration to ensure level_prefix_style is available
+  need('formatting_config')
+  global_level_style = level_prefix_style
+
+---
+id: questions_complete
+variable name: questions_complete
+code: |
+  # Initialize everything first
+  initialize_answer_placeholders
+  
+  # Start asking questions from the beginning
+  if not defined('current_question'):
+    current_question = 0
+  
+  # Check if we need to collect category feedback
+  if defined('need_category_feedback') and not defined('feedback_provided'):
+    # Ask for feedback - this will trigger the ask_category_feedback question
+    feedback_provided
+  
+  # If feedback was just provided, clean up and continue
+  if defined('feedback_provided') and defined('need_category_feedback'):
+    # Clean up the feedback variables
+    del need_category_feedback
+    del feedback_provided
+  
+  # Ask all questions one by one
+  current_question_response
+  
+  # Mark complete only when all questions have been asked
+  if defined('questions') and defined('current_question') and current_question >= len(questions):
+    questions_complete = True
+
+---
+id: initialize_answer_placeholders
+code: |
+  # Load questions first
+  need('questions_loaded')
+  
+  # Initialize answers as plain Python list (not DAList to avoid pickle issues)
+  if not defined('answers'):
+    answers = [None] * len(questions)
+    log(f"✅ Initialized {len(questions)} answer placeholders")
+  
+  # Initialize current question index
+  if not defined('current_question'):
+    current_question = 0
+  
+  # Initialize category feedback dict
+  if not defined('category_feedback'):
+    category_feedback = {}
+    
+  initialize_answer_placeholders = True
+
+---
+id: current_question_choices
+depends on:
+  - current_question
+  - global_level_style
+code: |
+  # Force evaluation of the global level style first
+  need('global_level_style')
+  current_style = global_level_style
+  
+  def format_level_display_local(level_index, description_text, style):
+    if style == "number":
+      prefix = str(level_index + 1)
+    elif style == "letter":
+      letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+      prefix = letters[level_index] if level_index < len(letters) else f"L{level_index}"
+    elif style == "none":
+      return description_text
+    else:
+      prefix = f"Level {level_index}"
+    
+    if description_text:
+      return f"{prefix}: {description_text}"
+    else:
+      return prefix
+  
+  if defined('questions') and defined('current_question') and current_question < len(questions) and 'levels' in questions[current_question]:
+    raw_levels = questions[current_question]['levels']
+    formatted_choices = []
+    for i, description_text in enumerate(raw_levels):
+      try:
+        formatted_choice = format_level_display_local(i, description_text, current_style)
+      except Exception as e:
+        formatted_choice = f"Level {i}: {description_text}"
+      formatted_choices.append(formatted_choice)
+    current_question_choices = formatted_choices
+  else:
+    current_question_choices = ['Loading...']
+
+---
+question: |
+  <h3 class="mb-2">${ questions[current_question]['prompt'] if defined('questions') and defined('current_question') and current_question < len(questions) else 'Loading question...' }</h3>
+logo: |
+  <img src="${ logo_file.url_for() }" alt="Logo" class="brand-logo" style="height:50px; width:auto; vertical-align:middle;">
+subquestion: |
+  % if defined('questions') and defined('current_question') and current_question < len(questions):
+  <div class="card mb-3">
+    <div class="card-header bg-primary text-white">
+      <h4>📋 ${questions[current_question]['category']}</h4>
+    </div>
+    <div class="card-body">
+      <div class="mb-3">
+        <div class="progress">
+          <div class="progress-bar" role="progressbar" 
+               style="width: ${(current_question + 1) * 100 / len(questions)}%; background: linear-gradient(90deg, #007bff, #28a745);" 
+               aria-valuenow="${current_question + 1}" 
+               aria-valuemin="0" 
+               aria-valuemax="${len(questions)}">
+          </div>
+        </div>
+        <div class="text-center mt-2">
+          <small class="text-muted">
+            Question ${current_question + 1} of ${len(questions)} overall
+            % if defined('questions') and current_question < len(questions):
+            <br>
+            <%
+            # Calculate category-specific progress
+            current_category = questions[current_question]['category']
+            category_questions = [q for q in questions if q['category'] == current_category]
+            category_position = 1
+            for i, q in enumerate(questions):
+              if q['category'] == current_category:
+                if i == current_question:
+                  break
+                category_position += 1
+            %>
+            (Question ${category_position} of ${len(category_questions)} for ${current_category})
+            % endif
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+  % else:
+  <div class="card mb-3">
+    <div class="card-header bg-secondary text-white">
+      <h4>Loading...</h4>
+    </div>
+  </div>
+  % endif
+fields:
+  - no label: answers[current_question]
+    datatype: radio
+    code: current_question_choices
+field: current_question_response
+validation code: |
+  # Log the answer being stored
+  log(f"✅ Question {current_question + 1}: Answer stored as '{answers[current_question]}'")
+  
+  # Check if this is the last question in the current category
+  is_last_in_category = False
+  if current_question >= len(questions) - 1:  # Last question overall
+    is_last_in_category = True
+  elif questions[current_question]['category'] != questions[current_question + 1]['category']:
+    is_last_in_category = True
+  
+  if is_last_in_category:
+    # Set the category that needs feedback
+    need_category_feedback = questions[current_question]['category']
+    log(f"🔄 Category '{need_category_feedback}' completed, will ask for feedback")
+  
+  # Move to next question
+  current_question += 1
+  
+  # Force regeneration of choices for the next question
+  if defined('current_question_choices'):
+    del current_question_choices
+  
+  # If there are more questions, clear this response so we ask the next one
+  if current_question < len(questions):
+    del current_question_response
+
+---
+id: ask_category_feedback
+question: |
+  Category Complete: ${need_category_feedback}
+subquestion: |
+  You've completed all questions in the **${need_category_feedback}** category.
+  
+  Is there anything we should have asked about in this category but didn't?
+  
+  This is optional but helps us improve future assessments.
+fields:
+  - no label: category_feedback[need_category_feedback]
+    datatype: area
+    required: False
+    rows: 3
+continue button field: feedback_provided
+
+---
+id: calculate_category_averages_dynamic
+code: |
+  # Trigger scoring calculation from scoring.yml
+  calculate_scores_and_averages
+  
+  # Mark as calculated
+  calculate_category_averages_dynamic = True
+
+---

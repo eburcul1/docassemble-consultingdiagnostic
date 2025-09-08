@@ -1,0 +1,247 @@
+---
+metadata:
+  title: Configuration Constants
+  description: Centralized configuration for all hardcoded values and constants
+
+---
+# =============================================================================
+# ASSESSMENT CONFIGURATION CONSTANTS
+# =============================================================================
+
+---
+id: load_configuration_constants
+code: |
+  """
+  Load all configuration constants from external sources or set defaults.
+  This eliminates hardcoded values throughout the codebase.
+  """
+  log("⚙️ Loading configuration constants...")
+  
+  # Load industry averages from CSV
+  if not defined('industry_averages_loaded'):
+    try:
+      import csv
+      from docassemble.base.util import path_and_mimetype
+      
+      industry_averages = {}
+      file_path, _ = path_and_mimetype('FinalQuestionsIDwScore.csv')
+      
+      with open(file_path, encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+          # Extract industry average from CSV
+          if 'IndustryNormScore' in row and row['IndustryNormScore']:
+            try:
+              score = float(row['IndustryNormScore'])
+              industry_averages['default'] = score
+              break  # Use first valid score as default
+            except (ValueError, TypeError):
+              continue
+      
+      # Set default if not found in CSV
+      if not industry_averages:
+        industry_averages['default'] = 2.18  # Fallback default
+        log("⚠️ No industry averages found in CSV, using fallback: 2.18")
+      
+      define('industry_averages', industry_averages)
+      industry_averages_loaded = True
+      log(f"✅ Industry averages loaded: {industry_averages}")
+      
+    except Exception as e:
+      log(f"❌ Failed to load industry averages: {e}")
+      # Set safe defaults
+      industry_averages = {'default': 2.18}
+      define('industry_averages', industry_averages)
+      industry_averages_loaded = True
+
+---
+# =============================================================================
+# PROCESSING CONFIGURATION
+# =============================================================================
+
+---
+id: processing_config
+code: |
+  """
+  Processing screen and background task configuration.
+  """
+  # Processing screen timing (milliseconds)
+  processing_total_ms = 60000  # 60 seconds
+  processing_step_interval = 10000  # 10 seconds per step
+  
+  # Background task timeouts
+  ai_task_timeout_seconds = 120  # 2 minutes max
+  background_poll_interval = 5  # Check every 5 seconds
+  
+  # Progress steps configuration
+  progress_steps = [
+    {'t': 0, 'msg': 'Initializing Analysis Engine…'},
+    {'t': 10000, 'msg': 'Loading responses…'},
+    {'t': 20000, 'msg': 'Scoring answers…'},
+    {'t': 30000, 'msg': 'Preparing Visualizations…'},
+    {'t': 40000, 'msg': 'Generating Insights…'},
+    {'t': 50000, 'msg': 'Generating Executive Summary…'}
+  ]
+  
+  define('processing_total_ms', processing_total_ms)
+  define('processing_step_interval', processing_step_interval)
+  define('ai_task_timeout_seconds', ai_task_timeout_seconds)
+  define('background_poll_interval', background_poll_interval)
+  define('progress_steps', progress_steps)
+
+---
+# =============================================================================
+# ASSESSMENT FORMATTING CONFIGURATION
+# =============================================================================
+
+---
+id: formatting_config
+code: |
+  """
+  Assessment formatting and display configuration.
+  """
+  # Level prefix style for question choices
+  level_prefix_style = "letter"  # Options: "letter", "number", "none"
+  
+  # Level mapping for scoring - maps letter choices to numeric scores
+  # Used throughout the system for:
+  # - Converting user answers (A, B, C, D, E) to numeric scores (0, 1, 2, 3, 4)
+  # - Calculating category averages and overall scores
+  # - Generating individual scores for visualizations
+  # - Comparing user performance against industry norms
+  # A=0 (lowest), B=1, C=2, D=3, E=4 (highest)
+  level_mapping = {
+    'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4
+  }
+  
+  # Letter choices for formatting
+  letter_choices = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+  
+  define('level_prefix_style', level_prefix_style)
+  define('level_mapping', level_mapping)
+  define('letter_choices', letter_choices)
+
+---
+# =============================================================================
+# SCORING THRESHOLDS AND CONSTANTS
+# =============================================================================
+
+---
+id: scoring_config
+code: |
+  """
+  Scoring system configuration and thresholds.
+  """
+  # Scoring thresholds
+  maturity_thresholds = {
+    'low': 1.5,
+    'medium': 2.5,
+    'high': 3.5
+  }
+  
+  # Default values for fallbacks
+  defaults = {
+    'industry_level': 2.0,
+    'overall_score': 0.0,
+    'category_score': 0.0
+  }
+  
+  # Heatmap configuration
+  heatmap_config = {
+    'low_threshold': 2.0,
+    'high_threshold': 3.0
+  }
+  
+  define('maturity_thresholds', maturity_thresholds)
+  define('defaults', defaults)
+  define('heatmap_config', heatmap_config)
+
+---
+# =============================================================================
+# UI CONFIGURATION
+# =============================================================================
+
+---
+id: ui_config
+code: |
+  """
+  User interface configuration constants.
+  """
+  # Logo configuration
+  logo_config = {
+    'height': 100,
+    'max_width': 300
+  }
+  
+  # Progress bar configuration
+  progress_config = {
+    'height': '10px',
+    'animation_duration': '0.5s'
+  }
+  
+  # Button configuration
+  button_config = {
+    'continue_label': 'Continue to download',
+    'restart_label': 'Restart',
+    'exit_label': 'Exit'
+  }
+  
+  define('logo_config', logo_config)
+  define('progress_config', progress_config)
+  define('button_config', button_config)
+
+---
+# =============================================================================
+# AI PROCESSING CONFIGURATION
+# =============================================================================
+
+---
+id: ai_config
+code: |
+  """
+  AI processing configuration and limits.
+  """
+  # Content generation limits
+  content_limits = {
+    'executive_summary_max_chars': 2000,
+    'insights_max_chars': 1500,
+    'questions_max_chars': 1000,
+    'services_max_chars': 2000
+  }
+  
+  # Processing flags
+  ai_flags = {
+    'enable_parallel_processing': True,
+    'enable_fallback_content': True,
+    'enable_error_recovery': True
+  }
+  
+  define('content_limits', content_limits)
+  define('ai_flags', ai_flags)
+
+---
+# =============================================================================
+# CONFIGURATION VALIDATION
+# =============================================================================
+
+---
+id: validate_configuration
+code: |
+  """
+  Validate that all required configuration is loaded.
+  """
+  required_configs = [
+    'industry_averages', 'processing_total_ms', 'level_mapping',
+    'maturity_thresholds', 'defaults', 'logo_config', 'level_prefix_style'
+  ]
+  
+  missing_configs = []
+  for config_name in required_configs:
+    if not defined(config_name):
+      missing_configs.append(config_name)
+  
+  if missing_configs:
+    log(f"❌ Missing required configurations: {missing_configs}")
+    raise Exception(f"Configuration validation failed: {missing_configs}")
+  else:
+    log("✅ All configuration constants validated successfully")

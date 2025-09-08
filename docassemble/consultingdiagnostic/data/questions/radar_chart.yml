@@ -1,0 +1,161 @@
+---
+metadata:
+  title: radar_chart.yml
+---
+id: generate_radar_plot_simple
+code: |
+  # Generate radar plot with THREAD-SAFE matplotlib handling
+  
+  if not defined('radar_plot_generated') or not radar_plot_generated:
+    log("RADAR PLOT: Starting THREAD-SAFE radar plot generation...")
+    
+    # Check if we have the required data - CHECK MULTIPLE SOURCES
+    plot_data = None
+    if defined('category_scores') and category_scores:
+      plot_data = dict(category_scores)  # Convert to plain dict if DADict
+      log(f"RADAR PLOT: Using category_scores with {len(plot_data)} categories")
+    elif defined('category_averages_calc') and category_averages_calc:
+      plot_data = dict(category_averages_calc)
+      log(f"RADAR PLOT: Using category_averages_calc with {len(plot_data)} categories")
+    elif defined('category_averages') and category_averages:
+      plot_data = dict(category_averages)
+      log(f"RADAR PLOT: Using category_averages with {len(plot_data)} categories")
+    
+    if plot_data:
+      
+      try:
+        # THREAD-SAFE matplotlib import and configuration
+        import matplotlib
+        matplotlib.use('Agg')  # Use non-interactive backend BEFORE pyplot
+        
+        # Import pyplot after setting backend
+        import matplotlib.pyplot as plt
+        
+        # Clear any existing matplotlib state to prevent threading issues
+        plt.close('all')
+        import numpy as np
+        from docassemble.base.util import DAFile
+        import io
+        
+        # Force matplotlib to use thread-safe settings
+        plt.ioff()  # Turn off interactive mode
+        
+        # Set matplotlib to not use any GUI backend
+        matplotlib.use('Agg', force=True)
+        
+        # Prepare data for radar plot - USE LOCAL VARIABLES ONLY
+        categories_list = list(plot_data.keys())
+        values_list = list(plot_data.values())
+        
+        # Number of categories
+        N = len(categories_list)
+        
+        # Compute angle for each category
+        angles = [n / float(N) * 2 * np.pi for n in range(N)]
+        angles += angles[:1]  # Complete the circle
+        
+        # Add the first value to the end to complete the circle
+        values_list += values_list[:1]
+        
+        # Create figure with explicit cleanup
+        fig, ax = plt.subplots(figsize=(6.0, 6.0), dpi=150, subplot_kw=dict(polar=True))
+        
+        # Set transparent background
+        fig.patch.set_alpha(0.0)
+        ax.patch.set_alpha(0.0)
+        
+        # Plot the radar chart with dark grey line and transparent fill
+        ax.fill(angles, values_list, color='darkgrey', alpha=0.1)
+        ax.plot(angles, values_list, linewidth=2, color='darkgrey', marker='o', markersize=8)
+        
+        # Category labels - BLACK text for visibility
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(categories_list, fontsize=10, fontweight='normal', color='black')
+        
+        # Y-axis settings - BLACK text
+        ax.set_ylim(0, 4)
+        ax.set_yticks([0, 1, 2, 3, 4])
+        ax.set_yticklabels(['0', '1', '2', '3', '4'], fontsize=10, fontweight='bold', color='black')
+        
+        # Title - BLACK text
+        ax.set_title("Maturity Assessment Results", pad=25, fontsize=14, fontweight='bold', color='black')
+        
+        # Grid - dark grey for visibility on transparent background
+        ax.grid(True, alpha=0.3, linewidth=1, color='gray')
+        
+        # Set radial grid lines to black
+        ax.tick_params(colors='black')
+        
+        plt.tight_layout(pad=1.0)
+        
+        # Save plot to bytes - THREAD-SAFE
+        img_buffer = io.BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
+        img_buffer.seek(0)
+        
+        # CRITICAL: Close figure and clear matplotlib state immediately
+        plt.close(fig)
+        plt.close('all')
+        
+        # Create DAFile object - THIS HAS .show() METHOD!
+        radar_plot = DAFile('radar_plot')
+        radar_plot.initialize(filename='radar_plot.png')
+        plot_data = img_buffer.getvalue()
+        radar_plot.write(plot_data, binary=True)
+        radar_plot.commit()
+        
+        # Clear the buffer
+        img_buffer.close()
+        
+        # Ensure the file is properly accessible
+        log(f"✅ Radar plot file created: {radar_plot.filename}, size: {len(plot_data)} bytes")
+        
+        # Verify the file is properly committed and accessible
+        if hasattr(radar_plot, 'filename') and radar_plot.filename:
+            log(f"✅ Radar plot file verified: {radar_plot.filename}")
+        else:
+            log("❌ Radar plot file not properly committed")
+            
+        # Ensure the show() method is available
+        if hasattr(radar_plot, 'show'):
+            log("✅ Radar plot show() method verified")
+        else:
+            log("❌ Radar plot show() method not available")
+        
+        log(f"RADAR PLOT: Generated matplotlib radar plot with THREAD-SAFE cleanup")
+        radar_plot_generated = True
+        
+        # Force garbage collection to clean up any matplotlib objects
+        import gc
+        gc.collect()
+        
+      except Exception as e:
+        log(f"RADAR PLOT ERROR: {str(e)}")
+        # Fallback: Create empty DAFile that still has .show() method
+        radar_plot = DAFile('radar_plot_fallback')
+        radar_plot.initialize(filename='radar_plot_fallback.txt')
+        radar_plot.write(b'Radar plot generation failed', binary=True)
+        radar_plot.commit()
+        radar_plot_generated = True
+      
+    else:
+      log("RADAR PLOT: No data available, creating placeholder")
+      # Create placeholder DAFile that has .show() method
+      radar_plot = DAFile('radar_plot_placeholder')
+      radar_plot.initialize(filename='radar_plot_placeholder.txt')
+      radar_plot.write(b'Radar plot data not available', binary=True)
+      radar_plot.commit()
+      radar_plot_generated = True
+      
+    # Ensure we always have radar_plot defined
+    if not defined('radar_plot'):
+      radar_plot = DAFile('radar_plot_fallback')
+      radar_plot.initialize(filename='radar_plot_fallback.txt')
+      radar_plot.write(b'Radar plot loading failed', binary=True)
+      radar_plot.commit()
+      radar_plot_generated = True
+  else:
+    log("RADAR PLOT: Radar plot already generated")
+  
+  # Set completion flag
+  generate_radar_plot_simple = True 

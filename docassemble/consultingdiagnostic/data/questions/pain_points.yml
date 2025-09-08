@@ -1,0 +1,82 @@
+---
+metadata:
+  title: pain_points.yml - Simple Pain Points Loader
+
+---
+initial: True
+id: pain_points_loaded
+code: |
+  import csv
+  from docassemble.base.util import path_and_mimetype
+  
+  pain_points_csv_data = {}
+  
+  try:
+    file_path, _ = path_and_mimetype('pain_points.csv')
+    with open(file_path, encoding='utf-8') as f:
+      reader = list(csv.DictReader(f))
+      
+      for row in reader:
+        pain_id = (row['ID'] if 'ID' in row else '').strip()
+        category = (row['Category'] if 'Category' in row else '').strip()
+        title = (row['Title'] if 'Title' in row else '').strip()
+        description = (row['Description'] if 'Description' in row else '').strip()
+        
+        if pain_id:
+          pain_points_csv_data[pain_id] = {
+            'id': pain_id,
+            'category': category,
+            'title': title,
+            'description': description
+          }
+    
+    log(f"✅ Loaded {len(pain_points_csv_data)} pain points from CSV")
+    
+  except Exception as e:
+    log(f"⚠️ Error loading pain points CSV: {e}")
+    pain_points_csv_data = {}
+  
+  pain_points_loaded = True
+
+---
+code: |
+  # Create choices as a list of tuples for DocAssemble checkboxes
+  pain_points_choices_list = []
+  for pain_id, data in pain_points_csv_data.items():
+    pain_points_choices_list.append((pain_id, data['title']))
+  # Add "None of the above" option
+  pain_points_choices_list.append(('none_above', 'None of the above'))
+
+---
+question: |
+  ### Whats Most Important to You
+  
+  <div class="assessment-card">
+  Before we dive into the assessment, help us understand what's most important to you. Select the top three common business challenges (those most important to you)from the list below. This helps us provide more targeted insights and recommendations.
+  </div>
+help: |
+  **Challenge Descriptions:**
+  
+  % for pain_id, data in pain_points_csv_data.items():
+  - **${ data['title'] }**: ${ data['description'] }
+  % endfor
+
+fields:
+  - no label: user_selected_challenges
+    datatype: checkboxes
+    minlength: 1
+    maxlength: 3
+    code: pain_points_choices_list
+    item grid: 6
+    validation messages:
+      minlength: Please select at least 1 issue.
+      maxlength: Please select a maximum of 3 issues.
+  - If you selected "None of the above", please tell us what challenges your firm faces: user_information['custom_challenges']
+    datatype: area
+    required: False
+    show if:
+      variable: user_selected_challenges['none_above']
+      is: True
+    help: |
+      Please describe the specific challenges or obstacles your consulting firm faces that weren't covered in the list above.
+continue button field: collect_pain_points_complete 

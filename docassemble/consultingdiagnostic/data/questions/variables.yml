@@ -1,0 +1,785 @@
+---
+metadata:
+  title: variables.yml
+---
+features:
+  debug: true
+
+# Level prefix style moved to config.yml formatting_config
+
+---
+modules:
+  - docassemble.base.util
+
+---
+imports:
+  - json
+  - re
+  - math
+  - random
+  - gc
+
+---
+objects:
+  - questions: list
+  - categories: list
+  - combined: list
+  - industry_norms: list
+  # REMOVED DAList/DADict objects to prevent threading and pickle issues
+  # Using plain Python lists and dicts instead
+  # - answers: DAList.using(auto_gather=False, gathered=True)
+  # - category_feedback: DADict
+  # - assessment_data: DADict  
+  # - assessment_state: DADict
+  # - user_answers: DADict
+  # - user_information: DADict
+  # - category_scores: DADict
+  # - final_scores: DADict
+
+---
+id: initialize_assessment_data
+code: |
+  # Initialize assessment data structure - PLAIN DICT (no threading)
+  if not defined('assessment_data'):
+    assessment_data = {}
+  assessment_data['responses'] = {}
+  assessment_data['category_scores'] = {}
+  assessment_data['final_scores'] = {}
+  assessment_data['timestamp'] = None
+
+---
+id: initialize_core_variables
+code: |
+  """
+  Centralized variable initialization system.
+  This replaces scattered variable checks throughout the main file.
+  """
+  log("🔧 Initializing core variables...")
+  
+  # Initialize user information structure
+  if not defined('user_information'):
+    user_information = DADict('user_information', auto_gather=False)
+    user_information.gathered = True
+    log("✅ Created user_information structure")
+  
+  # Initialize core assessment variables
+  core_vars = {
+    'answers': [],
+    'questions': [],
+    'individual_scores': [],
+    'category_scores': {},
+    'category_averages': {},
+    'pain_points': [],
+    'user_selected_challenges': {},
+    'selected_pain_points_details': [],
+    'custom_challenges_text': '',
+    'pain_points_csv_data': {},
+    'ai_prompts': {"prompts": {}},
+    'radar_plot_generated': False,
+    'lollipop_plot_generated': False,
+    'ai_processing_complete': False,
+    'processing_started': False,
+    'processing_complete': False,
+    'questions_processed': False,
+    'feedback_provided': False,
+    'proceeded_to_results': False,
+    'comprehensive_variables_defined': False
+  }
+  
+  # Ensure pain points variables are always initialized
+  pain_points_vars = {
+    'selected_pain_points_details': [],
+    'pain_points_count': 0,
+    'pain_points_selected_count': 0,
+    'selected_pain_points_count': 0,
+    'selected_challenges_count': 0
+  }
+  
+  for var_name, default_value in pain_points_vars.items():
+    if not defined(var_name):
+      globals()[var_name] = default_value
+      log(f"✅ Initialized pain points variable: {var_name}")
+  
+  for var_name, default_value in core_vars.items():
+    if not defined(var_name):
+      globals()[var_name] = default_value
+      log(f"✅ Initialized {var_name}")
+  
+  # Initialize count variables
+  count_vars = {
+    'answers_count': 0,
+    'questions_count': 0,
+    'individual_scores_count': 0,
+    'category_scores_count': 0,
+    'pain_points_count': 0,
+    'pain_points_selected_count': 0,
+    'selected_pain_points_count': 0,
+    'selected_challenges_count': 0
+  }
+  
+  for var_name, default_value in count_vars.items():
+    if not defined(var_name):
+      globals()[var_name] = default_value
+      log(f"✅ Initialized {var_name}")
+  
+  # Ensure questions_count is always available and properly calculated
+  if not defined('questions_count'):
+    if defined('questions') and questions:
+      questions_count = len(questions)
+    else:
+      questions_count = 0
+    log(f"✅ Safety: Set questions_count = {questions_count}")
+  
+  log("✅ Core variables initialized")
+
+---
+id: initialize_user_information
+code: |
+  """
+  Initialize user information from form data.
+  """
+  if not defined('user_information') or not user_information:
+    user_information = DADict('user_information', auto_gather=False)
+    
+    # Set user data from form fields
+    user_fields = {
+      'first_name': 'user_first_name',
+      'last_name': 'user_last_name', 
+      'company': 'user_company',
+      'role': 'user_role',
+      'email': 'user_email',
+      'industry': 'user_industry'
+    }
+    
+    for info_key, form_field in user_fields.items():
+      if defined(form_field):
+        user_information[info_key] = globals()[form_field]
+        setattr(user_information, info_key, user_information[info_key])
+      else:
+        user_information[info_key] = ''
+        setattr(user_information, info_key, '')
+    
+    user_information.gathered = True
+    log(f"✅ User information initialized: {user_information.get('first_name', 'Unknown')} at {user_information.get('company', 'Unknown')}")
+  else:
+    log(f"✅ User information already available: {user_information.get('first_name', 'Unknown')} at {user_information.get('company', 'Unknown')}")
+
+---
+id: initialize_category_scores
+code: |
+  # Initialize category scores structure - PLAIN DICT (no threading)
+  if not defined('category_scores'):
+    category_scores = {}
+  
+  # Only initialize if categories have been loaded from CSV
+  if defined('categories') and categories:
+    for category in categories:
+      category_scores[category] = 0
+
+---
+id: initialize_final_scores
+code: |
+  # Initialize final scores structure - PLAIN DICT (no threading)
+  if not defined('final_scores'):
+    final_scores = {}
+  final_scores['overall_score'] = 0
+  final_scores['maturity_level'] = ""
+  final_scores['recommendations'] = []
+
+---
+id: initialize_assessment_state
+code: |
+  # Initialize assessment state - PLAIN DICT (no threading)
+  if not defined('assessment_state'):
+    assessment_state = {}
+    assessment_state['validated'] = False
+    assessment_state['plots_ready'] = False
+    assessment_state['initialized'] = True
+
+---
+id: initialize_answer_placeholders
+code: |
+  # CRITICAL FIX: Plain Python list initialization for answers (no DAList/pickle issues)
+  
+  # Initialize current question index
+  if not defined('current_question'):
+    current_question = 0
+  
+  # Ensure answers plain list is properly set up when questions are loaded
+  if defined('questions') and questions and not defined('answers_properly_initialized'):
+    # Initialize as plain Python list (not DAList to avoid pickle errors)
+    if not defined('answers'):
+      answers = [None] * len(questions)
+    
+    answers_properly_initialized = True
+    log(f"✅ Plain list answers initialized with {len(questions)} positions")
+
+  # Initialize industry norms when questions are loaded - SAFE access
+  if defined('questions') and questions and not defined('industry_norms'):
+    industry_norms = []
+    for q in questions:
+      try:
+        # SAFE dictionary access
+        if isinstance(q, dict) and 'IndustryNormScore' in q:
+          score = float(q['IndustryNormScore'])
+        else:
+          score = 0.0
+      except (ValueError, TypeError):
+        score = 0.0
+      industry_norms.append(score)
+
+  # Initialize category feedback as plain dict (no threading)
+  if not defined('category_feedback_initialized') and defined('categories') and categories:
+    if not defined('category_feedback'):
+      category_feedback = {}
+    for category in categories:
+      category_feedback[category] = ''
+    category_feedback_initialized = True
+  
+  initialize_answer_placeholders = True
+
+# =============================================================================
+# CATEGORY FEEDBACK SYSTEM
+# =============================================================================
+# Track category feedback
+category_feedback: {}
+
+---
+id: initialize_plot_variables
+code: |
+  """
+  Initialize and clean up plot-related variables.
+  """
+  log("📊 Initializing plot variables...")
+  
+  # Clear old plot variables to start fresh
+  plot_vars_to_clear = ['radar_plot', 'lollipop_plot', 'radar_plot_generated', 'lollipop_plot_generated']
+  for var_name in plot_vars_to_clear:
+    if defined(var_name):
+      log(f"🧹 Clearing old session variable: {var_name}")
+      undefine(var_name)
+  
+  # Reset plot flags
+  radar_plot_generated = False
+  lollipop_plot_generated = False
+  log("✅ Plot variables initialized")
+
+---
+id: calculate_pain_points_data
+code: |
+  """
+  Calculate pain points data from user selections.
+  """
+  log("📋 Calculating pain points data...")
+  
+  # Calculate pain points count from user selections
+  pain_points_count = 0
+  if defined('user_selected_challenges') and user_selected_challenges:
+    # Handle both DADict and regular dict
+    if hasattr(user_selected_challenges, 'items'):
+      # It's a DADict or regular dict
+      # Ensure DADict is gathered if needed
+      if hasattr(user_selected_challenges, 'gathered') and not user_selected_challenges.gathered:
+        try:
+          user_selected_challenges.gathered = True
+          log("🔍 DEBUG: Gathered DADict for pain points calculation")
+        except Exception as gather_error:
+          log(f"🔍 DEBUG: Failed to gather DADict: {gather_error}")
+      
+      # Get all items and filter
+      try:
+        all_items = list(user_selected_challenges.items())
+        log(f"🔍 DEBUG: All items from user_selected_challenges: {all_items}")
+        selected_challenges = [k for k, v in all_items if v and k != 'none_above']
+        log(f"🔍 DEBUG: Selected challenges after filtering: {selected_challenges}")
+      except Exception as items_error:
+        log(f"🔍 DEBUG: Error getting items: {items_error}")
+        selected_challenges = []
+    else:
+      # It might be a different structure, try to convert
+      selected_challenges = []
+      try:
+        for k, v in user_selected_challenges.items():
+          if v and k != 'none_above':
+            selected_challenges.append(k)
+      except Exception as loop_error:
+        log(f"🔍 DEBUG: Error in loop: {loop_error}")
+        selected_challenges = []
+    
+    pain_points_count = len(selected_challenges)
+    log(f"✅ Pain points count from user selections: {pain_points_count} (excluding none_above)")
+  elif defined('pain_points') and pain_points:
+    pain_points_count = len(pain_points)
+    log(f"✅ Pain points count from pain_points list: {pain_points_count}")
+  else:
+    log("🔍 DEBUG: No user_selected_challenges or pain_points found")
+  
+  # Set related variables
+  pain_points_selected_count = pain_points_count
+  selected_pain_points_count = pain_points_count
+  selected_challenges_count = pain_points_count
+  
+  # Debug: Log the actual user_selected_challenges structure
+  if defined('user_selected_challenges') and user_selected_challenges:
+    log(f"🔍 DEBUG: user_selected_challenges type: {type(user_selected_challenges)}")
+    log(f"🔍 DEBUG: user_selected_challenges content: {user_selected_challenges}")
+    if hasattr(user_selected_challenges, 'items'):
+      log(f"🔍 DEBUG: user_selected_challenges items: {list(user_selected_challenges.items())}")
+      # Check if it's a DADict and needs to be gathered
+      if hasattr(user_selected_challenges, 'gathered') and not user_selected_challenges.gathered:
+        log("🔍 DEBUG: DADict not gathered, attempting to gather...")
+        try:
+          user_selected_challenges.gathered = True
+          log("🔍 DEBUG: DADict gathered successfully")
+        except Exception as gather_error:
+          log(f"🔍 DEBUG: Failed to gather DADict: {gather_error}")
+    else:
+      log("🔍 DEBUG: user_selected_challenges does not have items() method")
+  else:
+    log("🔍 DEBUG: user_selected_challenges is not defined or empty")
+  
+  log(f"✅ Pain points data calculated: {pain_points_count}")
+
+---
+id: calculate_individual_scores
+code: |
+  """
+  Calculate individual scores for visualization plots.
+  """
+  # Ensure level mapping configuration is loaded
+  need('formatting_config')
+  
+  log("🔢 Calculating individual scores for plots...")
+  
+  if (not defined('individual_scores') or not individual_scores or len(individual_scores) == 0) and defined('questions') and questions and defined('answers') and answers:
+    individual_scores = []
+    
+    def parse_answer_level_inline(answer_str, levels):
+      """Parse answer text to get level index (0-4)"""
+      if not answer_str or not levels:
+        return 0
+      
+      answer_str = str(answer_str).strip()
+      
+      # Get the current level prefix style from configuration
+      current_style = level_prefix_style
+      
+      # Letter style: "A: description", "B: description", etc.
+      if current_style == "letter" and len(answer_str) >= 2 and answer_str[1] == ':':
+        first_char = answer_str[0].upper()
+        if first_char in ['A', 'B', 'C', 'D', 'E']:
+          # Use centralized level mapping instead of hardcoded calculation
+          level_index = level_mapping.get(first_char, 0)
+          if 0 <= level_index < len(levels):
+            return level_index
+        
+        # Also try without the colon (in case the answer is just "A", "B", etc.)
+        if len(answer_str) == 1 and answer_str.upper() in ['A', 'B', 'C', 'D', 'E']:
+          level_index = level_mapping.get(answer_str.upper(), 0)
+          if 0 <= level_index < len(levels):
+            return level_index
+      
+      # Number style: "1: description", "2: description", etc.
+      elif current_style == "number" and len(answer_str) >= 2 and answer_str[1] == ':' and answer_str[0].isdigit():
+        number = int(answer_str[0])
+        if 1 <= number <= 5:  # 1-based numbering
+          level_index = number - 1  # Convert to 0-based
+          if 0 <= level_index < len(levels):
+            return level_index
+      
+      # None style: just the description text (no prefix)
+      elif current_style == "none":
+        # Try exact match first
+        for i, level_text in enumerate(levels):
+          if level_text and level_text.strip().lower() == answer_str.lower():
+            return i
+        
+        # Try partial text matching for "none" style
+        for i, level_text in enumerate(levels):
+          if level_text and level_text.lower() in answer_str.lower():
+            return i
+      
+      # Fallback: try partial text matching for any style
+      for i, level_text in enumerate(levels):
+        if level_text and level_text.lower() in answer_str.lower():
+          return i
+      
+      return 0  # Default to 0 if no match
+    
+    # Process each question-answer pair for plots
+    min_length = min(len(questions), len(answers))
+    for i in range(min_length):
+      question = questions[i]
+      answer = answers[i] if i < len(answers) else None
+      
+      if answer is not None:
+        # Parse user level
+        levels = question.get('levels', [])
+        user_level = parse_answer_level_inline(answer, levels)
+        
+        # Get industry level
+        industry_level = float(question.get('IndustryNormScore', 2.0))
+        
+        # Create individual score entry for plots
+        individual_scores.append({
+          'question_label': f"Q{i+1}: {question.get('prompt', question.get('Prompt', 'Question'))[:30]}...",
+          'user_level': user_level,
+          'industry_level': industry_level,
+          'category': question.get('category', question.get('AssessmentCategory', 'General'))
+        })
+    
+    log(f"✅ Generated {len(individual_scores)} individual scores for plots")
+  else:
+    log(f"✅ Individual scores already available: {len(individual_scores) if individual_scores else 0} entries")
+
+---
+id: setup_category_averages
+code: |
+  """
+  Setup category averages from category scores.
+  """
+  log("📊 Setting up category averages...")
+  
+  if not defined('category_averages') or not category_averages:
+    if defined('category_scores') and category_scores:
+      category_averages = dict(category_scores)
+      log(f"✅ Set category_averages from category_scores: {category_averages}")
+    else:
+      log("❌ ERROR: No category data available - scoring failed!")
+  else:
+    log(f"✅ Category averages already available: {category_averages}")
+  
+  # Verify critical scoring variables
+  critical_vars = ['overall_score', 'industry_average', 'category_scores']
+  for var in critical_vars:
+    if not defined(var):
+      log(f"❌ ERROR: {var} not calculated - scoring system failed!")
+  
+  # Set default values for missing core variables
+  if not defined('answers'):
+    answers = []
+    log("⚠️ Set default answers = []")
+  
+  if not defined('questions'):
+    questions = []
+    log("⚠️ Set default questions = []")
+  
+  log("✅ Category averages setup complete")
+
+---
+id: setup_ai_variables
+code: |
+  """
+  Setup AI processing variables and status.
+  """
+  log("🤖 Setting up AI variables...")
+  
+  # Check AI variable status
+  ai_variables = ['executive_summary', 'contradictions_insights', 'challenge_questions', 'recommended_services']
+  missing_variables = []
+  
+  for var in ai_variables:
+    if not defined(var):
+      missing_variables.append(var)
+      log(f"⚠️ {var} still undefined - waiting for AI processing")
+  
+  # Set AI processing complete flag
+  if not defined('ai_processing_complete'):
+    ai_processing_complete = False
+  
+  # Check if all AI content is available
+  if len(missing_variables) == 0:
+    # All variables are defined, check if they have content
+    all_have_content = all(
+      defined(var) and eval(var) and eval(var) != f"{var.replace('_', ' ').title()} generation failed"
+      for var in ai_variables
+    )
+    
+    if all_have_content:
+      ai_processing_complete = True
+      define('ai_processing_complete', True)
+      log("✅ AI processing complete - all content available")
+    else:
+      log("⚠️ AI variables defined but some may have failed generation")
+  else:
+    log(f"⏳ Waiting for {len(missing_variables)} AI variables to be generated")
+  
+  log("✅ AI variables setup complete")
+
+---
+id: setup_count_variables
+code: |
+  """
+  Setup count variables for template processing.
+  """
+  # COUNT VARIABLES for template
+  import builtins
+  len = builtins.len
+  
+  count_mappings = {
+    'answers_count': 'answers',
+    'questions_count': 'questions', 
+    'individual_scores_count': 'individual_scores',
+    'category_scores_count': 'category_scores'
+  }
+  
+  for count_var, source_var in count_mappings.items():
+    if not defined(count_var):
+      source_data = globals().get(source_var, [])
+      globals()[count_var] = len(source_data) if source_data else 0
+      log(f"✅ Set {count_var} = {globals()[count_var]}")
+  
+  # Ensure questions_count is always defined as a fallback
+  if not defined('questions_count'):
+    questions_count = len(questions) if defined('questions') and questions else 0
+    log(f"✅ Fallback: Set questions_count = {questions_count}")
+
+---
+id: setup_assessment_date
+code: |
+  """
+  Setup assessment date for document generation.
+  """
+  # 📅 ASSESSMENT DATE - Define BEFORE template_field_data to prevent circular dependency
+  from datetime import datetime
+  current_date = datetime.now()
+  define('assessment_date', current_date.strftime('%B %d, %Y'))
+  log(f"✅ Assessment date set to: {assessment_date}")
+
+---
+id: load_external_data
+code: |
+  """
+  Load external data files (CSV, JSON).
+  """
+  log("📁 Loading external data...")
+  
+  # Load pain points CSV data
+  if not defined('pain_points_csv_data') or not pain_points_csv_data:
+    try:
+      import csv
+      from docassemble.base.util import path_and_mimetype
+      
+      pain_points_csv_data = {}
+      file_path, _ = path_and_mimetype('pain_points.csv')
+      with open(file_path, encoding='utf-8') as f:
+        reader = list(csv.DictReader(f))
+        
+        for row in reader:
+          pain_id = (row['ID'] if 'ID' in row else '').strip()
+          category = (row['Category'] if 'Category' in row else '').strip()
+          title = (row['Title'] if 'Title' in row else '').strip()
+          description = (row['Description'] if 'Description' in row else '').strip()
+          
+          if pain_id:
+            pain_points_csv_data[pain_id] = {
+              'id': pain_id,
+              'category': category,
+              'title': title,
+              'description': description
+            }
+      log(f"SUCCESS: Loaded {len(pain_points_csv_data)} pain points from CSV")
+    except Exception as e:
+      log(f"ERROR: Failed to load pain points CSV: {e}")
+      pain_points_csv_data = {}
+  
+  # Load AI prompts
+  if not defined('ai_prompts') or not ai_prompts:
+    try:
+      import json
+      from docassemble.base.util import path_and_mimetype
+      
+      file_path, _ = path_and_mimetype('ai_prompts.json')
+      with open(file_path, 'r', encoding='utf-8') as f:
+        ai_prompts = json.load(f)
+      log(f"SUCCESS: Loaded AI prompts from {file_path}")
+    except Exception as e:
+      log(f"ERROR: Failed to load AI prompts: {e}")
+      ai_prompts = {"prompts": {}}
+  
+  log("SUCCESS: External data loaded")
+
+---
+id: process_pain_points_details
+code: |
+  """
+  Process pain points details for template generation.
+  """
+  # Ensure selected_pain_points_details is initialized
+  if not defined('selected_pain_points_details'):
+    selected_pain_points_details = []
+    log("✅ Initialized selected_pain_points_details list")
+  
+  # Clear existing details to rebuild
+  selected_pain_points_details.clear()
+  
+  if defined('user_selected_challenges') and user_selected_challenges and pain_points_csv_data:
+    for pain_id, is_selected in user_selected_challenges.items():
+      if is_selected and pain_id != 'none_above' and pain_id in pain_points_csv_data:
+        pain_data = pain_points_csv_data[pain_id]
+        selected_pain_points_details.append({
+          'id': pain_id,
+          'title': pain_data.get('title', 'Unknown'),
+          'description': pain_data.get('description', 'No description'),
+          'category': pain_data.get('category', 'General')
+        })
+    log(f"✅ Extracted {len(selected_pain_points_details)} pain points details for template")
+  else:
+    log("⚠️ No pain points details available for template - missing user_selected_challenges or pain_points_csv_data")
+  
+  # Process custom challenges
+  custom_challenges_text = ''
+  if defined('user_selected_challenges') and user_selected_challenges and user_selected_challenges.get('none_above'):
+    if defined('user_information') and user_information and user_information.get('custom_challenges'):
+      custom_challenges_text = user_information.get('custom_challenges', '')
+      log(f"✅ Extracted custom challenges: {custom_challenges_text[:50]}...")
+    else:
+      log("⚠️ 'None of the above' selected but no custom challenges found")
+  else:
+    log("✅ No custom challenges (none_above not selected)")
+  
+  # Ensure all pain points variables are properly defined for template
+  if not defined('selected_pain_points_count'):
+    selected_pain_points_count = len(selected_pain_points_details) if selected_pain_points_details else 0
+    log(f"✅ Template safety: Set selected_pain_points_count = {selected_pain_points_count}")
+  
+  if not defined('pain_points_selected_count'):
+    pain_points_selected_count = selected_pain_points_count
+    log(f"✅ Template safety: Set pain_points_selected_count = {pain_points_selected_count}")
+  
+  if not defined('selected_challenges_count'):
+    selected_challenges_count = selected_pain_points_count
+    log(f"✅ Template safety: Set selected_challenges_count = {selected_challenges_count}")
+
+---
+id: prepare_template_data
+code: |
+  """
+  Prepare template data for document generation.
+  """
+  log("📄 Preparing template data...")
+  
+  # Clear existing template data to rebuild
+  if defined('template_field_data'):
+    undefine('template_field_data')
+  
+  # Ensure questions_count is available for template
+  if not defined('questions_count'):
+    if defined('questions') and questions:
+      questions_count = len(questions)
+    else:
+      questions_count = 0
+    log(f"✅ Template safety: Set questions_count = {questions_count}")
+  
+  # Ensure all pain points variables are available for template
+  pain_points_template_vars = {
+    'selected_pain_points_details': [],
+    'pain_points_count': 0,
+    'pain_points_selected_count': 0,
+    'selected_pain_points_count': 0,
+    'selected_challenges_count': 0,
+    'custom_challenges_text': '',
+    'user_selected_challenges': {},
+    'pain_points_csv_data': {}
+  }
+  
+  for var_name, default_value in pain_points_template_vars.items():
+    if not defined(var_name):
+      globals()[var_name] = default_value
+      log(f"✅ Template safety: Set {var_name} = {default_value}")
+  
+  # Build template data with safe defaults
+  template_field_data = {
+    # Core assessment data
+    'user_information': user_information,
+    'overall_score': overall_score,
+    'industry_average': industry_average,
+    'category_scores': category_scores,
+    'answers': answers,
+    'questions': questions,
+    'questions_count': questions_count,
+    'assessment_date': assessment_date,
+    'report_version': '1.0',
+    
+    # AI content with safe defaults
+    'executive_summary': (executive_summary if defined('executive_summary') else ''),
+    'contradictions_insights': (contradictions_insights if defined('contradictions_insights') else ''),
+    'challenge_questions': (challenge_questions if defined('challenge_questions') else ''),
+    'recommended_services': (recommended_services if defined('recommended_services') else ''),
+    'ai_processing_complete': (ai_processing_complete if defined('ai_processing_complete') else False),
+    
+    # Plot files
+    'radar_plot': radar_plot if defined('radar_plot') and radar_plot and hasattr(radar_plot, 'filename') else None,
+    'lollipop_plot': lollipop_plot if defined('lollipop_plot') and lollipop_plot and hasattr(lollipop_plot, 'filename') else None,
+    'radar_plot_available': defined('radar_plot') and radar_plot is not None,
+    'lollipop_plot_available': defined('lollipop_plot') and lollipop_plot is not None,
+    
+    # Pain points data
+    'selected_pain_points_count': selected_pain_points_count if defined('selected_pain_points_count') else 0,
+    'pain_points_selected_count': pain_points_selected_count if defined('pain_points_selected_count') else 0,
+    'selected_pain_points_details': selected_pain_points_details if defined('selected_pain_points_details') else [],
+    'custom_challenges_text': custom_challenges_text if defined('custom_challenges_text') else '',
+    'user_selected_challenges': user_selected_challenges if defined('user_selected_challenges') else {},
+    'pain_points_csv_data': pain_points_csv_data if defined('pain_points_csv_data') else {}
+  }
+  
+  # Setup offering documents list
+  if not defined('offering_document_files_list'):
+    offering_document_files_list = []
+    if defined('offering_document_files') and offering_document_files:
+      offering_document_files_list = list(offering_document_files.values())
+  
+  # Set document status
+  if not defined('document_merger_status'):
+    document_merger_status = 'Document processing complete'
+  
+  log("SUCCESS: Template data prepared")
+
+---
+id: cleanup_pickle_safety
+code: |
+  """
+  Clean up objects that might cause pickle issues.
+  """
+  # 🧹 FINAL PICKLE SAFETY CLEANUP
+  try:
+    # Remove datetime import that might have threading references
+    if 'datetime' in locals():
+      del datetime
+    if 'current_date' in locals():
+      del current_date
+    # Keep only the string value: assessment_date
+    log("🧹 Cleaned up datetime objects, kept assessment_date string")
+  except:
+    pass
+  
+  # 🚨 EMERGENCY PICKLE SAFETY - Remove specific problematic objects
+  try:
+    # Remove any matplotlib/plotting objects that might have locks
+    variables_to_clean = ['plt', 'matplotlib', 'fig', 'ax', 'axes']
+    for var_name in variables_to_clean:
+      if var_name in locals():
+        del locals()[var_name]
+        log(f"🧹 Removed {var_name}")
+    
+    # Remove any OpenAI-related objects that might have been stored
+    openai_vars = ['client', 'openai', 'api_key']
+    for var_name in openai_vars:
+      if var_name in locals():
+        del locals()[var_name]
+        log(f"🧹 Removed {var_name}")
+        
+    log("✅ Emergency pickle cleanup completed")
+  except Exception as cleanup_error:
+    log(f"⚠️ Cleanup error: {str(cleanup_error)}")
+
+  # Simplified cleanup to prevent timeouts
+  try:
+    import gc
+    gc.collect()
+    log("🧹 Simplified cleanup completed")
+  except Exception as cleanup_error:
+    log(f"⚠️ Cleanup error: {str(cleanup_error)}")
+
+  log("✅ Comprehensive variable definition complete - all Word template functionality ready")
+  comprehensive_variables_defined = True 

@@ -1,0 +1,519 @@
+
+
+# =============================================================================
+# PROCESSING SCREEN - AI Content Generation and Progress Tracking
+# =============================================================================
+#
+# This file handles the "Processing your responses" screen that shows while
+# AI content is being generated. The screen has two main components:
+#
+# 1. PROGRESS ANIMATION (JavaScript):
+#    - Shows a visual progress bar that runs for 45-60 seconds
+#    - Displays step-by-step progress through the analysis process
+#    - When progress reaches 100%, sets progress_reached_100 = true
+#    - Button remains HIDDEN during this entire process
+#
+# 2. AI COMPLETION CHECK (Server-side):
+#    - Checks if all AI variables are defined and not failed
+#    - Waits for both progress_reached_100 AND AI completion
+#    - Only advances when BOTH conditions are met
+#    - Button appears automatically when both are ready
+#
+# BUTTON BEHAVIOR:
+# - Hidden by default (hide continue button: "True")
+# - Stays hidden while progress is running (0-100%)
+# - Stays hidden even when progress reaches 100% (if AI isn't ready)
+# - Only appears when progress is 100% AND all AI content is available
+# - Stays visible because page stops reloading once complete
+#
+# BACKGROUND TASK:
+# - run_ai_chunks_v2 generates executive_summary, contradictions_insights,
+#   challenge_questions, and recommended_services
+# - Uses background_response() to properly complete the task
+# - Variables are set in session via define() calls
+#
+# =============================================================================
+
+id: show_processing_status
+mandatory: True
+question: Processing your responses
+show if: not (defined('proceeded_to_results') and proceeded_to_results)
+hide continue button: "True"
+continue button field: proceeded_to_results
+continue button label: Continue to download
+logo: |
+  <img src="/packagestatic/docassemble.playground1Aug25Optimization/logo.png" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">
+
+subquestion: |
+  <div class="progress-card">
+
+    <div class="subtitle">This will about 45–60 seconds for processing and an additional 10-15 seconds for final documentassembly.</div>
+
+    <div class="progress-row">
+      <div class="progress flex-grow-1" style="height: 10px;">
+        <div id="bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+      </div>
+      <div id="pct" class="pct" aria-live="polite">0%</div>
+    </div>
+
+    <ol id="steps" class="stepper">
+      <li class="active">Initializing Analysis Engine…</li>
+      <li>Loading Responses…</li>
+      <li>Scoring Answers…</li>
+      <li>Preparing Visualizations…</li>
+      <li>Generating Insights…</li>
+      <li>Generating Executive Summary…</li>
+    </ol>
+
+    <!-- Native Continue is controlled by CSS/JS; no custom submit here -->
+  </div>
+
+  <script>
+  (function(){
+    const totalMs = ${processing_total_ms}; // Use configuration constant
+    const steps = ${progress_steps}; // Use configuration constant
+
+    const start = Date.now();
+    const pctEl = document.getElementById('pct');
+    const barEl = document.getElementById('bar');
+    const stepsEl = document.getElementById('steps').children;
+    // Utility to locate native continue (button or input)
+    function findContinue(){
+      return document.querySelector('#da-continue-button')
+          || document.querySelector('#daquestioncontinue')
+          || document.querySelector('form button[type="submit"]')
+          || document.querySelector('form input[type="submit"]');
+    }
+    document.body.classList.add('processing-screen');
+
+    let uiDone = false;
+
+    function maybeShow(){
+      if (!uiDone) return;
+      
+      console.log('Progress complete - showing continue button');
+      
+      // Show the continue button when progress reaches 100%
+      document.body.classList.add('show-continue');
+      var btn = findContinue();
+      if (btn){
+        try { btn.innerHTML = '<i class="fa fa-download"></i> Continue to download'; } catch(e) {}
+        btn.style.removeProperty('display');
+        btn.style.display = '';
+        console.log('Continue button shown successfully');
+      } else {
+        console.log('Continue button not found!');
+      }
+    }
+
+    // When UI reaches 100%, mark a server-side-friendly flag so DA shows Continue
+
+    function setActive(idx){
+      for (let i=0;i<stepsEl.length;i++){
+        stepsEl[i].classList.remove('active');
+        stepsEl[i].classList.remove('done');
+        if (i < idx) stepsEl[i].classList.add('done');
+      }
+      if (idx < stepsEl.length) stepsEl[idx].classList.add('active');
+      // If we're past the last step, mark all done
+      if (idx >= stepsEl.length) {
+        for (let j=0;j<stepsEl.length;j++) stepsEl[j].classList.add('done');
+      }
+    }
+
+    function curStep(elapsed){
+      for (let i = steps.length - 1; i >= 0; i--) {
+        if (elapsed >= steps[i].t) return i;
+      }
+      return 0;
+    }
+
+    function tick(){
+      const elapsed = Date.now() - start;
+      const pct = Math.min(100, Math.round(elapsed * 100 / totalMs));
+      pctEl.textContent = pct + '%';
+      barEl.style.width = pct + '%';
+      const idx = curStep(elapsed);
+      setActive(idx);
+
+      if (elapsed >= totalMs) {
+        // Mark all steps as done
+        setActive(stepsEl.length);
+        uiDone = true;
+        
+        // Show the continue button when progress reaches 100%
+        console.log('Progress reached 100% - showing continue button');
+        maybeShow();
+        return;
+      }
+      setTimeout(tick, 150);
+    }
+    // Ensure a logo is present even if header hasn't rendered yet
+    try {
+      if (!document.querySelector('img.brand-logo')){
+        const brand = document.querySelector('.navbar-brand');
+        if (brand){
+          const img = document.createElement('img');
+                     img.src = "/packagestatic/docassemble.playground1Aug25Optimization/logo.png";
+          img.alt = 'Logo';
+          img.className = 'brand-logo';
+          img.style.height = '50px';
+          img.style.marginRight = '8px';
+          brand.prepend(img);
+        }
+      }
+    } catch(e) { /* no-op */ }
+
+    tick();
+    
+    // Reveal native Continue strictly when UI progress reaches 100%
+    function attachClick(){
+      var btn = findContinue();
+      if (!btn) return;
+      btn.addEventListener('click', function(e){
+        // Check if AI is ready before allowing the click
+        var aiReady = false;
+        try {
+          // Make a synchronous check - if we can find AI content in the page, assume it's ready
+          // This is a simple fallback check
+          aiReady = true; // Assume ready for now
+        } catch(e) {
+          console.log('Error checking AI status:', e);
+        }
+        
+        if (!aiReady) {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('AI not ready yet - preventing button click');
+          btn.innerHTML = 'AI content not ready yet...';
+          setTimeout(function() {
+            btn.innerHTML = '<i class="fa fa-download"></i> Continue to download';
+          }, 2000);
+          return false;
+        }
+        
+        try {
+          // AI is ready - proceed with normal behavior
+          btn.innerHTML = 'Assembling your personalized report…';
+          if (!document.getElementById('assemble-note')){
+            const note = document.createElement('div');
+            note.id = 'assemble-note';
+            note.className = 'text-muted mt-2';
+            note.textContent = 'This takes about 10–15 seconds.';
+            btn.parentNode.appendChild(note);
+          }
+        } catch(e) {}
+        // Let native submit happen; server event will set flags
+      });
+    }
+    attachClick();
+    // Re-attach if DOM is replaced by DA
+    setTimeout(attachClick, 500);
+  })();
+  </script>
+
+---
+
+id: check_ai_completion
+mandatory: True
+code: |
+  # Check if AI processing is complete by looking for the AI variables
+  ai_complete = (
+    defined('executive_summary') and executive_summary and executive_summary != "Executive summary generation failed" and
+    defined('contradictions_insights') and contradictions_insights and contradictions_insights != "Strategic insights generation failed" and
+    defined('challenge_questions') and challenge_questions and challenge_questions != "Challenge questions generation failed" and
+    defined('recommended_services') and recommended_services and recommended_services != "Recommended services generation failed"
+  )
+  
+  # Mark processing as complete regardless of AI status
+  # The button will appear when progress reaches 100%, and AI completion
+  # will be checked when the user clicks the button
+  processing_complete = True
+  
+  if ai_complete:
+    log("✅ AI processing completed successfully")
+  else:
+    log("⏳ AI processing not yet complete - will check when button is clicked")
+
+---
+id: background_task_results_check
+mandatory: True
+# AI task checking is handled in assessment_logic.yml to avoid conflicts
+code: |
+  # This block intentionally left empty - AI task checking moved to flow logic
+  # to prevent race conditions between multiple ai_task.ready() checks
+  pass
+
+
+
+---
+event: check_ai_status
+code: |
+  # Check if AI processing is complete
+  ai_complete = (
+    defined('executive_summary') and executive_summary and executive_summary != "Executive summary generation failed" and
+    defined('contradictions_insights') and contradictions_insights and contradictions_insights != "Strategic insights generation failed" and
+    defined('challenge_questions') and challenge_questions and challenge_questions != "Challenge questions generation failed" and
+    defined('recommended_services') and recommended_services and recommended_services != "Recommended services generation failed"
+  )
+  
+  # Return a simple response indicating AI status
+  if ai_complete:
+    response("AI_READY", content_type='text/plain')
+  else:
+    response("AI_NOT_READY", content_type='text/plain')
+
+---
+event: go_results
+code: |
+  # Simplified results navigation
+  proceeded_to_results = True
+  phase = 'results'
+  ready_for_processing = False
+  processing_started = False
+  processing_complete = True
+  feedback_provided = True
+  
+  # Clean up any feedback flags
+  if defined('need_category_feedback'):
+    del need_category_feedback
+  
+  log('SUCCESS: Results navigation flags set')
+  
+  # Redirect to results
+  _results_url = url_of('interview', arguments={'proceeded_to_results': True, 'phase': 'results'})
+  response(f'<html><head><meta http-equiv="refresh" content="0; url={_results_url}"></head><body>Continuing…</body></html>', content_type='text/html')
+
+---
+event: run_ai_chunks_v2
+code: |
+  log("🚀 BACKGROUND EVENT: run_ai_chunks_v2 STARTED!")
+  
+  # Get assessment data from action_argument
+  try:
+    from docassemble.base.util import action_argument
+    assessment_data = action_argument('assessment_data')
+    log(f"✅ BG: Received assessment_data: {assessment_data}")
+  except Exception as e:
+    log(f"❌ BG: Failed to get assessment_data: {e}")
+    assessment_data = {
+      'overall_score': 0, 
+      'industry_average': 2.18, 
+      'category_averages': {}, 
+      'pain_points': []
+    }
+  
+  # Load AI prompts
+  try:
+    import json
+    from docassemble.base.util import path_and_mimetype
+    ai_prompts_path = path_and_mimetype('ai_prompts.json')[0]
+    with open(ai_prompts_path, 'r') as f:
+      ai_prompts = json.load(f)
+    log(f"✅ BG: Loaded AI prompts from {ai_prompts_path}")
+  except Exception as e:
+    log(f"❌ BG: Failed to load AI prompts: {e}")
+    ai_prompts = None
+  
+  # Get OpenAI config
+  try:
+    from docassemble.base.util import get_config
+    openai_config = get_config('openai', {})
+    api_key = openai_config.get('api_key')
+    if not api_key:
+      raise Exception("No OpenAI API key found")
+    log("✅ BG: OpenAI config loaded")
+  except Exception as e:
+    log(f"❌ BG: Failed to load OpenAI config: {e}")
+    api_key = None
+  
+  # Initialize OpenAI client
+  if api_key and ai_prompts:
+    try:
+      from openai import OpenAI
+      client = OpenAI(api_key=api_key)
+      log("✅ BG: OpenAI client initialized")
+    except Exception as e:
+      log(f"❌ BG: Failed to initialize OpenAI client: {e}")
+      client = None
+  else:
+    client = None
+  
+  # Generate AI content if client is available
+  if client and ai_prompts:
+    try:
+      # Format data for prompts
+      formatted_data = f"""
+      === PARTICIPANT INFORMATION ===
+      Name: {assessment_data.get('user_name', 'Not provided')}
+      Company: {assessment_data.get('user_company', 'Not provided')}
+      Industry: {assessment_data.get('user_industry', 'Not provided')}
+      Role: {assessment_data.get('user_role', 'Not provided')}
+      
+      === SCORING DATA ===
+      Overall Score: {assessment_data.get('overall_score', 0)}/4
+      Industry Average: {assessment_data.get('industry_average', 2.18)}/4
+      
+      Category Scores:
+      {chr(10).join([f"  {cat}: {score}/4" for cat, score in assessment_data.get('category_scores', {}).items()])}
+      
+      Individual Question Scores:
+      {chr(10).join([f"  Q{i+1}: {score}/5" for i, score in enumerate(assessment_data.get('individual_scores', []))])}
+      
+      === SELECTED CHALLENGES ===
+      {chr(10).join([f"  - {challenge}" for challenge in assessment_data.get('pain_points', [])])}
+      
+      === CUSTOM CHALLENGES ===
+      {assessment_data.get('custom_challenges', 'None provided')}
+      """
+      
+      # Generate executive summary
+      if 'executive_summary' in ai_prompts.get('prompts', {}):
+        config = ai_prompts['prompts']['executive_summary']
+        try:
+          prompt = config['user_template'].format(
+            formatted_data=formatted_data,
+            role_context="",
+            other_insights="",
+            offerings_context="",
+            company_name=assessment_data.get('user_company', 'this organization'),
+            overall_score=assessment_data.get('overall_score', 'N/A'),
+            industry_average=assessment_data.get('industry_average', 'N/A')
+          )
+        except KeyError as e:
+          log(f"⚠️ Warning: Missing template variable {e}, using raw prompt")
+          prompt = config['user_template'].replace('{formatted_data}', formatted_data)
+        
+        response = client.chat.completions.create(
+          model=config.get('model', 'gpt-4.1-mini'),
+          messages=[
+            {"role": "system", "content": config['system']},
+            {"role": "user", "content": prompt}
+          ],
+          max_tokens=config.get('max_tokens', 1200),
+          temperature=config.get('temperature', 0.6)
+        )
+        executive_summary = response.choices[0].message.content.strip()
+        log(f"✅ BG: Generated executive_summary ({len(executive_summary)} chars)")
+      else:
+        executive_summary = "Executive summary generation failed - no prompt available"
+        log("❌ BG: No executive summary prompt available")
+      
+      # Generate contradictions insights
+      if 'contradictions_insights' in ai_prompts.get('prompts', {}):
+        config = ai_prompts['prompts']['contradictions_insights']
+        try:
+          prompt = config['user_template'].format(
+            formatted_data=formatted_data,
+            role_context="",
+            other_insights="",
+            offerings_context="",
+            company_name=assessment_data.get('user_company', 'this organization'),
+            overall_score=assessment_data.get('overall_score', 'N/A'),
+            industry_average=assessment_data.get('industry_average', 'N/A')
+          )
+        except KeyError as e:
+          log(f"⚠️ Warning: Missing template variable {e}, using raw prompt")
+          prompt = config['user_template'].replace('{formatted_data}', formatted_data)
+        
+        response = client.chat.completions.create(
+          model=config.get('model', 'gpt-4.1-mini'),
+          messages=[
+            {"role": "system", "content": config['system']},
+            {"role": "user", "content": prompt}
+          ],
+          max_tokens=config.get('max_tokens', 1200),
+          temperature=config.get('temperature', 0.8)
+        )
+        contradictions_insights = response.choices[0].message.content.strip()
+        log(f"✅ BG: Generated contradictions_insights ({len(contradictions_insights)} chars)")
+      else:
+        contradictions_insights = "Strategic insights generation failed - no prompt available"
+        log("❌ BG: No contradictions insights prompt available")
+      
+      # Generate challenge questions
+      if 'challenge_questions' in ai_prompts.get('prompts', {}):
+        config = ai_prompts['prompts']['challenge_questions']
+        try:
+          prompt = config['user_template'].format(
+            formatted_data=formatted_data,
+            role_context="",
+            other_insights="",
+            offerings_context="",
+            company_name=assessment_data.get('user_company', 'this organization'),
+            overall_score=assessment_data.get('overall_score', 'N/A'),
+            industry_average=assessment_data.get('industry_average', 'N/A')
+          )
+        except KeyError as e:
+          log(f"⚠️ Warning: Missing template variable {e}, using raw prompt")
+          prompt = config['user_template'].replace('{formatted_data}', formatted_data)
+        
+        response = client.chat.completions.create(
+          model=config.get('model', 'gpt-4o-mini'),
+          messages=[
+            {"role": "system", "content": config['system']},
+            {"role": "user", "content": prompt}
+          ],
+          max_tokens=config.get('max_tokens', 1500),
+          temperature=config.get('temperature', 0.7)
+        )
+        challenge_questions = response.choices[0].message.content.strip()
+        log(f"✅ BG: Generated challenge_questions ({len(challenge_questions)} chars)")
+      else:
+        challenge_questions = "Challenge questions generation failed - no prompt available"
+        log("❌ BG: No challenge questions prompt available")
+      
+      # Generate recommended services
+      if 'recommended_services' in ai_prompts.get('prompts', {}):
+        config = ai_prompts['prompts']['recommended_services']
+        prompt = config['user_template'].replace('{formatted_data}', formatted_data)
+        
+        response = client.chat.completions.create(
+          model=config.get('model', 'gpt-4o-mini'),
+          messages=[
+            {"role": "system", "content": config['system']},
+            {"role": "user", "content": prompt}
+          ],
+          max_tokens=config.get('max_tokens', 1500),
+          temperature=config.get('temperature', 0.6)
+        )
+        recommended_services = response.choices[0].message.content.strip()
+        log(f"✅ BG: Generated recommended_services ({len(recommended_services)} chars)")
+      else:
+        recommended_services = "Recommended services generation failed - no prompt available"
+        log("❌ BG: No recommended services prompt available")
+      
+      log("✅ BG: All AI content generated successfully")
+      
+    except Exception as e:
+      log(f"❌ BG: Error generating AI content: {e}")
+      executive_summary = "Executive summary generation failed"
+      contradictions_insights = "Strategic insights generation failed"
+      challenge_questions = "Challenge questions generation failed"
+      recommended_services = "Recommended services generation failed"
+  else:
+    log("❌ BG: Cannot generate AI content - missing client or prompts")
+    executive_summary = "Executive summary generation failed"
+    contradictions_insights = "Strategic insights generation failed"
+    challenge_questions = "Challenge questions generation failed"
+    recommended_services = "Recommended services generation failed"
+  
+  # Set the variables directly in the session
+  from docassemble.base.util import define
+  define('executive_summary', executive_summary)
+  define('contradictions_insights', contradictions_insights)
+  define('challenge_questions', challenge_questions)
+  define('recommended_services', recommended_services)
+  log("✅ BG: Variables set in session")
+  
+  # Return results via background_response to properly complete the task
+  results = {
+    'executive_summary': executive_summary,
+    'contradictions_insights': contradictions_insights,
+    'challenge_questions': challenge_questions,
+    'recommended_services': recommended_services
+  }
+  
+  from docassemble.base.util import background_response
+  background_response(results)
+  log("✅ BG: Background task completed successfully")

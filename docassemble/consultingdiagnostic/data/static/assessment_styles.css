@@ -1,0 +1,490 @@
+/* Processing: hide native continue until JS flips .show-continue */
+body.processing-screen:not(.show-continue) #daquestioncontinue,
+body.processing-screen:not(.show-continue) form button[type="submit"],
+body.processing-screen:not(.show-continue) form input[type="submit"] {
+  display: none !important;
+}
+body.processing-screen.show-continue #daquestioncontinue,
+body.processing-screen.show-continue form button[type="submit"],
+body.processing-screen.show-continue form input[type="submit"] {
+  display: inline-block !important;
+}
+
+/* Assessment System Styles */
+.assessment-card {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.score-display {
+  font-size: 24px;
+  font-weight: bold;
+  color: #007bff;
+  margin-bottom: 10px;
+}
+
+.debug-info {
+  background: #f1f3f4;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  padding: 12px;
+  font-family: monospace;
+  font-size: 12px;
+  margin-top: 20px;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 4px;
+  /* Remove default top margin to shrink white band above alerts */
+  margin: 0 0 10px 0 !important;
+}
+
+.alert-success {
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+  color: #155724;
+}
+
+.alert-info {
+  background-color: #d1ecf1;
+  border-color: #bee5eb;
+  color: #0c5460;
+}
+
+.alert-warning {
+  background-color: #fff3cd;
+  border-color: #ffeaa7;
+  color: #856404;
+}
+
+.text-center { text-align: center; }
+.text-primary { color: #007bff !important; }
+.text-success { color: #28a745 !important; }
+.text-secondary { color: #6c757d !important; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+.mt-1 { margin-top: 0.25rem; }
+.mt-4 { margin-top: 1.5rem; }
+
+.card {
+  border: 1px solid rgba(0,0,0,.125);
+  border-radius: 0.375rem;
+  background-color: #fff;
+}
+
+.card-body { padding: 1rem; }
+.border-light { border-color: #f8f9fa !important; }
+.small { font-size: 0.875em; }
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: -15px;
+  margin-left: -15px;
+}
+
+.col-md-3 {
+  flex: 0 0 25%;
+  max-width: 25%;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+.col-6 {
+  flex: 0 0 50%;
+  max-width: 50%;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+@media (max-width: 768px) {
+  .col-md-3 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+}
+
+.progress {
+  height: 20px;
+  background-color: #e9ecef;
+  border-radius: 10px;
+  margin: 20px auto;
+  max-width: 300px;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.6s ease;
+}
+
+.bg-success { background-color: #28a745 !important; }
+.bg-info { background-color: #17a2b8 !important; }
+.bg-warning { background-color: #ffc107 !important; }
+
+.processing-status {
+  max-width: 400px;
+  margin: 20px auto;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 20px;
+  margin: 10px 0;
+  border-radius: 8px;
+  border: 2px solid;
+  transition: all 0.3s ease;
+}
+
+.status-item.pending {
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+  color: #6c757d;
+}
+
+.status-item.processing {
+  background-color: #e3f2fd;
+  border-color: #2196f3;
+  color: #1976d2;
+}
+
+.status-item.completed {
+  background-color: #e8f5e8;
+  border-color: #4caf50;
+  color: #2e7d32;
+}
+
+.status-check {
+  color: #4caf50;
+  font-size: 18px;
+}
+
+.status-spinner {
+  color: #2196f3;
+} 
+
+/* Processing card (prettier interface) */
+.progress-card {
+  max-width: 720px;
+  margin: 0 auto 2rem auto; /* Add bottom margin for spacing above button */
+  padding: 1.25rem 1.5rem;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.06);
+}
+.progress-card .title {
+  /* Match the subtitle size per request */
+  font-size: .9rem !important;
+  line-height: 1.25rem;
+  font-weight: 600;
+}
+.progress-card .subtitle {
+  color: #6c757d;
+  font-size: .9rem;
+  margin-top: .25rem;
+}
+
+/* Revert question card tweaks and results overrides */
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin: .75rem 0 1rem 0;
+}
+.progress-row .pct {
+  width: 48px;
+  text-align: right;
+  color: #6c757d;
+}
+
+.stepper {
+  counter-reset: step;
+  list-style: none;
+  padding-left: 0;
+  margin: .25rem 0 1rem 0;
+}
+.stepper li {
+  position: relative;
+  padding-left: 2rem;
+  margin: .35rem 0;
+  color: #6c757d;
+}
+.stepper li::before {
+  content: counter(step);
+  counter-increment: step;
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: 1.25rem;
+  height: 1.25rem;
+  line-height: 1.25rem;
+  border-radius: 50%;
+  background: #e9ecef;
+  color: #6c757d;
+  text-align: center;
+  font-size: .8rem;
+}
+.stepper li.active {
+  color: #0d6efd;
+  font-weight: 600;
+}
+.stepper li.active::before {
+  background: #0d6efd;
+  color: #fff;
+}
+/* Keep step text blue after processing (not green) */
+.stepper li.done {
+  color: #0d6efd;
+}
+.stepper li.done::before {
+  content: "✓";
+  background: #0d6efd;
+  color: #fff;
+}
+
+.btn .spinner-border {
+  vertical-align: -2px;
+  margin-left: .35rem;
+}
+
+/* Navbar logo sizing */
+.navbar-brand img.brand-logo {
+  height: 50px;
+  width: auto;
+  margin-right: 8px;
+  display: inline-block;
+}
+
+/* Optional: prevent overlap under taller navbar */
+.da-pad-for-navbar { padding-top: 60px !important; }
+
+/* Optional semantic classes, if used */
+.processing .continue-to-download { display: none; }
+.processing-complete .continue-to-download { display: inline-block; }
+
+/* Sticky bar for results exit button */
+body.results-screen .results-sticky-bar {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding: 12px 0;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Dedicated footer area for the Restart button on results */
+body.results-screen .results-footer {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding: 12px 0;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: center;
+  z-index: 1000;
+}
+.results-sticky-bar .btn { margin: 0 6px; }
+
+/* Hide native question-level buttons on final results screen (we render footer controls) */
+body.results-screen .da-field-buttons,
+body.results-screen fieldset.da-field-buttons,
+body.results-screen .da-button-set,
+body.results-screen .question-buttons,
+body.results-screen .da-buttons {
+  display: none !important;
+}
+
+.results-sticky-bar .btn { margin: 0 6px; }
+
+/* Allow default top buttons on all screens; processing screen controls visibility via interview logic */
+
+/* Ensure the dynamic note matches subtitle size */
+#assemble-note {
+  font-size: .9rem !important;
+  line-height: 1.25rem;
+}
+
+/* Footer styling */
+.ve-footer {
+  background: none;
+  color: #000;
+  font-weight: 300; /* lighter */
+  text-align: center;
+  padding: 0; /* remove padding to control height precisely */
+  border-top: 1px solid #eee;
+  font-size: 0.75rem; /* smaller */
+  line-height: 1.15; /* compact two lines */
+  display: flex;
+  align-items: center;   /* vertical centering */
+  justify-content: center; /* horizontal centering */
+  height: 50px; /* fixed height for consistent centering */
+}
+
+/* Ensure footer text is properly centered */
+.ve-footer > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Final screen: render success alert in blue palette */
+body.results-screen .alert.alert-success {
+  background-color: #cfe2ff !important;  /* primary-subtle */
+  border-color: #b6d4fe !important;
+  color: #084298 !important;
+  margin-top: 0 !important; /* eliminate gap above */
+}
+
+/* More specific: the attachment success alert shown above downloads */
+body.results-screen .da-attachment-alert.alert-success,
+body.results-screen .da-attachment-alert-single.alert.alert-success {
+  background-color: #cfe2ff !important;
+  border-color: #b6d4fe !important;
+  color: #084298 !important;
+  padding: 12px 16px !important;  /* restore comfortable size of blue box */
+  line-height: 1.25;              /* readable line height */
+}
+
+/* Force final-screen success box to blue even if defaults change */
+#daform .alert.alert-success,
+.da-attachment-alert.alert-success,
+.da-attachment-alert-single.alert-success,
+.alert-success {
+  background-color: #cfe2ff !important;
+  border-color: #b6d4fe !important;
+  color: #084298 !important;
+}
+
+/* Final Download screenReduce spacing between the completion line and the alert */
+body.results-screen #daquestion h1 + p { margin-bottom: 0 !important; }
+
+/* Shrink the paragraph just under the H1 */
+body.results-screen #daquestion h1 ~ p:first-of-type {
+  margin-bottom: 0 !important; /* or 0 for tighter */
+}
+
+/* Remove explicit <br> injected between form and alert */
+body.results-screen #daform + br { display: none !important; }
+/* Same rule using server-provided body class */
+body.question-show-assessment-results #daform + br { display: none !important; }
+
+/* Collapse header block margin under the H1 */
+body.results-screen #daquestion .da-page-header { margin-bottom: 0 !important; padding-bottom: 0 !important; }
+body.question-show-assessment-results #daquestion .da-page-header { margin-bottom: 0 !important; padding-bottom: 0 !important; }
+/* Keep header content visible but tighten spacing; hide only the clear div */
+body.results-screen #daquestion .da-page-header h1,
+body.results-screen #daquestion .da-page-header h1.h3 {
+  margin: 0 0 .25rem 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+}
+body.results-screen #daquestion .da-page-header p {
+  margin: 0 0 .25rem 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+}
+body.results-screen #daquestion .daclear { display: none !important; margin: 0 !important; padding: 0 !important; height: 0 !important; }
+body.question-show-assessment-results #daquestion .da-page-header h1,
+body.question-show-assessment-results #daquestion .da-page-header h1.h3 {
+  margin: 0 0 .25rem 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+}
+body.question-show-assessment-results #daquestion .da-page-header p {
+  margin: 0 0 .25rem 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+}
+body.question-show-assessment-results #daquestion .daclear { display: none !important; margin: 0 !important; padding: 0 !important; height: 0 !important; }
+
+/* Compress general paragraph spacing on the results screen */
+body.results-screen #daquestion p { margin-bottom: 0 !important; }
+/* Make the H1 sit closer to next content */
+body.results-screen #daquestion h1 { margin-bottom: .2rem !important; }
+
+/* Final download alert: tighten height and top gap regardless of color */
+body.results-screen .da-attachment-alert,
+body.results-screen .da-attachment-alert-single {
+  margin-top: 0 !important;        /* remove gap above */
+}
+
+
+
+/* If a title wrapper exists above, remove its bottom margin */
+body.results-screen .da-attachment-title-wrapper {
+  margin-bottom: 0 !important;
+  font-style: italic !important; /* ensure wrapper itself is italic */
+}
+body.results-screen #daquestion .da-attachment-title-wrapper > h3 { font-style: italic !important; }
+body.question-show-assessment-results #daquestion .da-attachment-title-wrapper > h3 { font-style: italic !important; }
+
+/* Italicize the attachment title on the results screen (cover multiple DOM variants) */
+body.results-screen .da-attachment-title-wrapper h3,
+body.results-screen .da-attachment-title-wrapper .da-attachment-title,
+body.results-screen h3.da-attachment-title,
+body.results-screen .da-attachment-alert + h3,
+body.results-screen .da-attachment-alert-single + h3 {
+  font-style: italic !important;
+}
+
+/* Results: hide any horizontal rule that may create a white band above alert */
+body.results-screen #daquestion hr,
+body.results-screen #daform hr { display: none !important; }
+
+/* Results: remove hidden h2 layout impact anywhere on the page */
+body.results-screen h2.visually-hidden,
+body.results-screen #daquestion h2.visually-hidden,
+body.results-screen #daform h2.visually-hidden,
+body.results-screen form h2.visually-hidden {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Results: generic clamp for the first alert and its preceding paragraph */
+body.results-screen #daquestion .alert { 
+  margin-top: 0 !important; 
+  padding-top: 0 !important; 
+  padding-bottom: 0 !important; 
+}
+body.results-screen #daquestion > p { 
+  margin-bottom: 0 !important; 
+}
+
+/* Collapse whatever element sits immediately before the first attachment/alert */
+body.results-screen #daquestion > *:has(+ .da-attachment-alert),
+body.results-screen #daquestion > *:has(+ .da-attachment-alert-single),
+body.results-screen #daquestion > *:has(+ .da-attachment-title-wrapper),
+body.results-screen #daquestion > *:has(+ .alert) {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Italics catch-all around attachment title in case structure differs */
+body.results-screen #daform h3,
+body.results-screen #daform .h3,
+body.results-screen #daform .da-attachment-title,
+body.results-screen #daform .da-attachment-title a,
+body.results-screen #daform .da-attachment-title-wrapper,
+body.results-screen #daform .da-attachment-title-wrapper *,
+body.results-screen #daquestion .da-attachment-title,
+body.results-screen #daquestion .da-attachment-title *,
+body.results-screen .da-attachment-alert + h3,
+body.results-screen .da-attachment-alert-single + h3 {
+  font-style: italic !important;
+}
+

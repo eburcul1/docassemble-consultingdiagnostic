@@ -1,0 +1,31 @@
+license = "MIT"
+license-files = [
+    "LICENSE",
+]
+
+[build-system]
+requires = [
+    "setuptools>=80.9.0",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "docassemble.consultingdiagnostic"
+version = "0.0.1"
+description = "A docassemble extension."
+readme = "README.md"
+authors = [
+    { name = "System Administrator", email = "burcul_elvis@hotmail.com" },
+]
+dependencies = [
+    "matplotlib>=3.10.5",
+    "openai>=1.86.0",
+]
+
+[project.urls]
+Homepage = "https://docassemble.org"
+
+[tool.setuptools.packages.find]
+where = [
+    ".",
+]

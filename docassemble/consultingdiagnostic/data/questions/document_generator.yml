@@ -1,0 +1,57 @@
+---
+# Document Content Loader - Create objects for template iteration
+# Documents are already in template directory, just need to create objects
+
+---
+initial: True
+id: load_offering_document_content
+code: |
+  # Create document objects for template iteration - documents are already in template directory
+  if not defined('offering_document_content_loaded'):
+    from docassemble.base.util import DAObject
+    
+    # Initialize both dictionary and list for template compatibility
+    offering_document_files = {}
+    offering_document_files_list = []
+    
+    try:
+      # List of expected DOCX files that are already in the template directory
+      expected_files = [
+        "Assessment_Architecture_and_Build_Proposal_Insert.docx",
+        "Clarity_and_Visibility_Accelerator_Proposal_Insert.docx", 
+        "Growth_and_Loyalty_Booster_Proposal_Insert.docx",
+        "Lead_Flow_Builder_Proposal_Insert.docx",
+        "Maturity_Model_Design_Sprint_Proposal_Insert.docx",
+        "Project_Excellence_Toolkit_Proposal_Insert.docx",
+        "Proposal_and_Pitch_Package_Proposal_Insert.docx",
+        "Services_That_Sell_Workshop_Proposal_Insert.docx"
+      ]
+      
+      for filename in expected_files:
+        # Create object for template iteration (what your Jinja2 template expects)
+        doc_obj = DAObject()
+        doc_obj.name = filename.replace('_Proposal_Insert.docx', '').replace('_', ' ')
+        doc_obj.template_path = filename  # Just filename for include_docx_template
+        doc_obj.filename = filename
+        
+        # Store in both dictionary and list for template compatibility
+        offering_document_files[filename] = doc_obj
+        offering_document_files_list.append(doc_obj)
+        
+        log(f"✅ Created document object: {doc_obj.name} -> {filename}")
+      
+      log(f"📄 Document loading complete. Created {len(offering_document_files_list)} objects for template iteration")
+      
+      # Debug: Log the actual objects for troubleshooting
+      for i, doc_obj in enumerate(offering_document_files_list):
+        log(f"📄 Document {i+1}: name='{doc_obj.name}', template_path='{doc_obj.template_path}', filename='{doc_obj.filename}'")
+      
+      offering_document_content_loaded = True
+      document_loader_complete = True
+      
+    except Exception as e:
+      log(f"❌ Critical error in document loading: {str(e)}")
+      offering_document_files = {}
+      offering_document_files_list = []
+      offering_document_content_loaded = False 
+      document_loader_complete = False 

@@ -1,0 +1,1053 @@
+---
+metadata:
+  title: Consulting Services Business Maturity Diagnostic
+  short title: Diagnostic
+  version: 1.0 
+  description: |
+    Complete diagnostic system for consulting services business maturity assessment.
+    
+    Features:
+    - User information collection and validation
+    - Dynamic question loading from CSV with 25 assessment questions
+    - Real-time scoring and industry benchmarking (industry score from question file)
+    - AI-powered insights generation using OpenAI
+    - Output generation with Word template
+    - visualizations (radar and lollipop charts)
+    - Pain points analysis and service recommendations
+    - Document generation augmented with offering-specific content (inserted from static files)
+    
+    Architecture:
+    - Modular design with separated concerns
+    - Centralized configuration management via config.yml
+    - Robust error handling and fallbacks
+    - Pickle-safe document processing
+    - State management for complex navigation flows
+    - Background processing for AI content generation
+    
+    Dependencies:
+    
+    # =============================================================================
+    # CONFIGURATION & SETUP FILES
+    # =============================================================================
+    - config.yml: Centralized configuration and constants
+    - features.yml: UI/UX configuration and styling
+    - variables.yml: Core variable initialization
+    
+    # =============================================================================
+    # DATA PROCESSING & LOADING
+    # =============================================================================
+    - data_loader.yml: CSV data loading and processing
+    - pain_points.yml: Pain points analysis
+    
+    # =============================================================================
+    # ASSESSMENT CORE LOGIC
+    # =============================================================================
+    - questions.yml: Assessment questions and scoring
+    - scoring.yml: Score calculation algorithms
+    - assessment_logic.yml: Main business logic and flow control
+    
+    # =============================================================================
+    # VISUALIZATION COMPONENTS
+    # =============================================================================
+    - radar_chart.yml: Radar chart visualization
+    - lollipop_chart.yml: Lollipop chart visualization
+    
+    # =============================================================================
+    # AI & DOCUMENT GENERATION
+    # =============================================================================
+    - ai_generation.yml: AI content generation
+    - document_generator.yml: Document processing and generation
+    
+    # =============================================================================
+    # UI COMPONENTS & DISPLAY
+    # =============================================================================
+    - title_page.yml: Title page generation
+    - processing.yml: Processing status display
+     
+    Flow States:
+    1. welcome_assessment -> User information collection
+    2. questions.yml -> Question answering (25 questions)
+    3. processing.yml -> AI processing and scoring
+    4. show_assessment_results -> Results display and document generation
+    
+    Error Handling:
+    - Graceful fallback for missing logo files
+    - Safe defaults for configuration loading
+    - Comprehensive logging for debugging
+    - Pickle-safe document processing
+    - State recovery for interrupted sessions
+    
+    Author: Veloquent Consulting
+    Last Updated: January 2025
+    License: Proprietary - Veloquent Consulting
+  required privileges:
+    - admin
+  tags:
+    - assessment
+    - complete
+    - working
+    - business-maturity
+    - consulting-services
+    - ai-powered
+    - document-generation
+  exit link: off
+  logo: |
+    <img src="/packagestatic/docassemble.playground1Sept4demo/logo.png" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">
+  
+  head: |
+    <link rel="icon" type="image/png" href="packagestatic/docassemble.playground1Sept4demo/logo.png">
+    <link rel="shortcut icon" type="image/png" href="packagestatic/docassemble.playground1Sept4demo/logo.png">
+    <link rel="apple-touch-icon" type="image/png" href="packagestatic/docassemble.playground1Sept4demo/logo.png">
+  
+  footer: |
+    <div class="ve-footer">
+      <div>© 2025 Veloquent Consulting    |    diagnose quickly. propose boldly</div>
+    </div>
+
+---
+include:
+  - config.yml  # Configuration constants (NEW)
+  - variables.yml
+  - data_loader.yml
+  - questions.yml
+  - scoring.yml
+  - radar_chart.yml
+  - lollipop_chart.yml
+  - ai_generation.yml  # AI functionality enabled - CHUNKED APPROACH
+  - pain_points.yml
+  - document_generator.yml  # SIMPLE PICKLE-SAFE VERSION
+  - features.yml  # Extracted features configuration
+  - title_page.yml  # Extracted title page component
+  - assessment_logic.yml  # Extracted main assessment flow logic
+  - processing.yml  # Extracted processing screen component
+
+allow:
+  - status_json
+  - run_ai_chunks
+  - go_results
+
+---
+# =============================================================================
+# CORE DATA OBJECTS
+# =============================================================================
+# Purpose: Define the primary data structures used throughout the assessment
+# These objects store user data, processing results, and generated content
+# All objects are designed for pickle safety and session persistence
+
+objects:
+  # User information storage with validation
+  - user_information: DADict
+    # Purpose: Centralized storage for user/organization data
+    # Fields: first_name, last_name, company, role, email, industry
+    # Validation: Required fields enforced in welcome_assessment
+    # Usage: Template variable source for document generation
+    
+  # Debug information for troubleshooting
+  - debug_info: DAList.using(auto_gather=False)
+    # Purpose: Collect debug information during processing
+    # Usage: Log system state, errors, and processing steps
+    # Content: Error messages, processing timestamps, state transitions
+    
+  # Document generation output
+  - merged_assessment_doc: DAFile
+    # Purpose: Final generated assessment report
+    # Format: Word document with AI insights and visualizations
+    # Content: Executive summary, insights, recommendations, charts
+    
+  # Service offering documents
+  - offering_document_files: DADict.using(auto_gather=False, complete_attribute='gathered')
+    # Purpose: Store service offering document content
+    # Usage: Populate document templates with relevant service information
+    # Structure: Key-value pairs of service names and document content
+    
+  # Processing progress tracking
+  - progress_log: DAList.using(auto_gather=False)
+    # Purpose: Track processing steps and timing
+    # Usage: Monitor AI processing, scoring, and document generation
+    # Content: Step descriptions, timestamps, completion status
+    
+  # Logo file reference
+  - logo_file: DAStaticFile.using(filename='logo.png')
+    # Purpose: Provide consistent logo access across all screens
+    # Usage: Navbar branding, document headers, UI consistency
+    # Fallback: Graceful handling if logo file is missing
+
+
+---
+# =============================================================================
+# SYSTEM INITIALIZATION
+# =============================================================================
+# Purpose: Initialize core system components, load configuration,
+#          and prepare the assessment environment
+# Dependencies: config.yml, features.yml
+# Outputs: global_logo_url, system_ready_flag
+# Error Handling: Graceful fallback for missing resources
+
+initial: True
+id: initialize_system
+code: |
+  """
+  SYSTEM INITIALIZATION BLOCK
+  
+  This block performs the following critical setup tasks:
+  1. Loads all configuration constants from external sources
+  2. Initializes core variables using centralized system
+  3. Sets up logo handling with fallback mechanisms
+  4. Establishes global variables for template processing
+  
+  Configuration Loading Order:
+  - load_configuration_constants: Core assessment settings
+  - processing_config: Background task parameters
+  - formatting_config: UI and document formatting
+  - scoring_config: Assessment scoring algorithms
+  - ui_config: User interface settings
+  - ai_config: AI processing parameters
+  - validate_configuration: Configuration validation
+  
+  Error Handling:
+  - Graceful fallback for missing logo files
+  - Safe defaults for configuration loading
+  - Comprehensive logging for debugging
+  
+  Dependencies: config.yml, features.yml
+  """
+  
+  # Initialize configuration system first
+  need('load_configuration_constants')
+  need('processing_config')
+  need('formatting_config')  # Load formatting configuration
+  need('scoring_config')
+  need('ui_config')
+  need('ai_config')
+  need('validate_configuration')
+  
+  # Initialize core variables using centralized system
+  need('initialize_core_variables')
+  
+  # Get logo path dynamically using same technique as JSON files
+  try:
+    from docassemble.base.util import path_and_mimetype
+    logo_path, _ = path_and_mimetype('logo.png')
+    if logo_path:
+      logo_url = logo_path
+      log(f"✅ Logo path found: {logo_path}")
+    else:
+      logo_url = logo_file.url_for()
+      log(f"✅ Logo URL from DAStaticFile: {logo_url}")
+  except Exception as e:
+    logo_url = logo_file.url_for()
+    log(f"⚠️ Using fallback logo URL: {logo_url}")
+  
+  # Debug: Check what logo_url actually contains
+  log(f"🔍 Final logo_url value: {logo_url}")
+  log(f"🔍 logo_file.url_for(): {logo_file.url_for()}")
+  log(f"🔍 logo_file exists: {logo_file}")
+  
+  # Set global logo URL for use in templates
+  global_logo_url = logo_url
+  
+  # Also set a fallback direct URL
+  direct_logo_url = '/packagestatic/docassemble.playground1Aug25Optimization/logo.png'
+  
+  log(f"✅ System initialization complete - global_logo_url: {global_logo_url}")
+
+---
+# =============================================================================
+# ASSESSMENT FLOW CONTROL
+# =============================================================================
+# Purpose: Manage complex navigation logic between different assessment phases
+#          while preventing infinite loops and ensuring proper state transitions
+# Dependencies: assessment_logic.yml
+# State Management: Handles early exits, processing completion, and navigation
+
+id: flow_control
+mandatory: True
+code: |
+  """
+  FLOW CONTROL: Handle early exits and navigation logic
+  
+  This block manages the complex state transitions in the assessment flow:
+  
+  Flow States:
+  1. welcome_assessment -> User information collection
+      2. questions.yml -> Question answering (25 questions)
+      3. processing.yml -> AI processing and scoring
+  4. show_assessment_results -> Results display and document generation
+  
+  State Transitions:
+  - Early exit handling for users who proceed directly to results
+  - Processing completion detection and auto-advance
+  - Category feedback integration
+  - Document generation preparation
+  
+  Error Prevention:
+  - Prevents infinite loops in navigation
+  - Cleans up stale state flags
+  - Ensures proper variable initialization
+  """
+  
+  # FLOW CONTROL: Handle early exits and navigation logic
+  if defined('proceeded_to_results') and proceeded_to_results:
+    # User has already proceeded to results - skip all processing
+    ready_for_processing = False
+    processing_started = False
+    processing_complete = True
+    questions_processed = True
+    feedback_provided = True
+    
+    # Clean up any feedback flags
+    if defined('need_category_feedback'):
+      del need_category_feedback
+    
+    # Navigate to results
+    need('comprehensive_variables_defined')
+    
+    # FINAL PAIN POINTS CALCULATION - Right before document generation
+    log("🔍 FINAL PAIN POINTS CALCULATION - Right before document generation")
+    
+    # Ensure pain points CSV data is loaded
+    need('load_pain_points_csv')
+    
+    # Ensure pain points count is properly calculated for template
+    if defined('user_selected_challenges') and user_selected_challenges:
+      log(f"🔍 FINAL DEBUG: user_selected_challenges type: {type(user_selected_challenges)}")
+      log(f"🔍 FINAL DEBUG: user_selected_challenges content: {user_selected_challenges}")
+      
+      # Check if it's a DADict that needs to be gathered
+      if hasattr(user_selected_challenges, 'gathered') and not user_selected_challenges.gathered:
+        log("🔍 FINAL DEBUG: DADict not gathered - attempting to gather...")
+        try:
+          user_selected_challenges.gathered = True
+          log("🔍 FINAL DEBUG: DADict gathered successfully")
+        except Exception as e:
+          log(f"🔍 FINAL DEBUG: Error gathering DADict: {e}")
+      
+      # Handle both DADict and regular dict
+      if hasattr(user_selected_challenges, 'items'):
+        log("🔍 FINAL DEBUG: Processing as dict-like object")
+        all_items = list(user_selected_challenges.items())
+        log(f"🔍 FINAL DEBUG: All items: {all_items}")
+        
+        selected_challenges = [k for k, v in all_items if v and k != 'none_above']
+        log(f"🔍 FINAL DEBUG: Selected items (excluding none_above): {selected_challenges}")
+      else:
+        log("🔍 FINAL DEBUG: Not a dict-like object, trying alternative processing")
+        selected_challenges = []
+        try:
+          for k, v in user_selected_challenges:
+            if v and k != 'none_above':
+              selected_challenges.append(k)
+          log(f"🔍 FINAL DEBUG: Selected items from iteration: {selected_challenges}")
+        except Exception as e:
+          log(f"🔍 FINAL DEBUG: Error processing non-dict object: {e}")
+          selected_challenges = []
+      
+      selected_pain_points_count = len(selected_challenges)
+      pain_points_selected_count = selected_pain_points_count
+      selected_challenges_count = selected_pain_points_count
+      log(f"✅ Final pain points count calculation: {selected_pain_points_count}")
+      
+      # Populate selected_pain_points_details with actual pain point information
+      selected_pain_points_details = []
+      
+      # Debug: Check what's in pain_points_csv_data
+      log(f"🔍 FINAL DEBUG: pain_points_csv_data type: {type(pain_points_csv_data) if defined('pain_points_csv_data') else 'undefined'}")
+      if defined('pain_points_csv_data') and pain_points_csv_data:
+        log(f"🔍 FINAL DEBUG: pain_points_csv_data keys: {list(pain_points_csv_data.keys()) if hasattr(pain_points_csv_data, 'keys') else 'no keys method'}")
+        log(f"🔍 FINAL DEBUG: pain_points_csv_data sample: {list(pain_points_csv_data.items())[:2] if hasattr(pain_points_csv_data, 'items') else 'no items method'}")
+        
+        for challenge_id in selected_challenges:
+          log(f"🔍 FINAL DEBUG: Checking challenge_id: {challenge_id}")
+          if challenge_id in pain_points_csv_data:
+            pain_point = pain_points_csv_data[challenge_id]
+            log(f"🔍 FINAL DEBUG: Found pain_point data: {pain_point}")
+            selected_pain_points_details.append({
+              'title': pain_point.get('title', challenge_id),
+              'description': pain_point.get('description', 'No description available')
+            })
+            log(f"🔍 FINAL DEBUG: Added pain point: {challenge_id} -> {pain_point.get('title', challenge_id)}")
+          else:
+            log(f"🔍 FINAL DEBUG: challenge_id {challenge_id} NOT found in pain_points_csv_data")
+      else:
+        log("🔍 FINAL DEBUG: pain_points_csv_data is not defined or empty")
+      
+      log(f"🔍 FINAL DEBUG: selected_pain_points_details populated with {len(selected_pain_points_details)} items")
+      log(f"🔍 FINAL DEBUG: selected_pain_points_details content: {selected_pain_points_details}")
+    else:
+      log("🔍 FINAL DEBUG: user_selected_challenges is not defined or empty")
+      selected_pain_points_count = 0
+      pain_points_selected_count = 0
+      selected_challenges_count = 0
+    
+    need('show_assessment_results')
+
+---
+# =============================================================================
+# USER INFORMATION COLLECTION
+# =============================================================================
+# Purpose: Collect and validate user/organization information for personalization
+# Validation: Required fields, email format, industry classification
+# Outputs: user_information DADict, user_info_collected flag
+# Usage: Template variables for document generation and personalization
+
+id: welcome_assessment
+mandatory: True
+question: |
+  **Let's get started with some basic information about you and your organization.**
+  
+logo: |
+  <img src="${ logo_file.url_for() }" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">
+
+subquestion: |
+  <div class="assessment-card">
+  <p>This information helps us personalize your assessment results and recommendations.</p>
+  </div>
+  
+fields:
+  # Required personal information
+  - First Name: user_first_name
+    required: True
+    # Purpose: Personalize assessment results and document generation
+    
+  - Last Name: user_last_name
+    required: True
+    # Purpose: Complete name for document headers and personalization
+    
+  - Company Name: user_company
+    required: True
+    # Purpose: Organization context for industry benchmarking and document naming
+    
+  # Role classification for targeted recommendations
+  - Your Role: user_role
+    choices:
+      - Executive/CEO
+      - Senior Manager
+      - Department Head
+      - Team Lead
+      - Consultant
+      - Other
+    required: True
+    # Purpose: Tailor insights and recommendations to decision-making level
+    
+  # Optional contact information
+  - Email: user_email
+    datatype: email
+    required: False
+    # Purpose: Follow-up communications and report delivery
+    
+  # Industry classification for benchmarking
+  - Industry: user_industry
+    choices:
+      - Technology
+      - Healthcare
+      - Financial Services
+      - Professional Services
+      - Manufacturing
+      - Retail
+      - Education
+      - Non-Profit
+      - Other
+    required: False
+    # Purpose: Industry-specific benchmarking and recommendations
+
+continue button field: user_info_collected
+
+---
+# =============================================================================
+# SAFETY CHECKS AND VALIDATION
+# =============================================================================
+# Purpose: Ensure all required data is available before proceeding to critical operations
+# Checks: User information, questions completion, critical variables, AI processing status
+# Fallback Mechanisms: Creates default values when data is missing
+# Error Recovery: Graceful degradation and comprehensive logging
+
+id: safety_checks
+code: |
+  """
+  SAFETY CHECKS AND VALIDATION
+  
+  This block ensures all required data is available before proceeding
+  to critical operations like document generation and results display.
+  
+  Checks Performed:
+  1. User information completeness and validation
+  2. Questions completion status verification
+  3. Critical variables availability (scores, averages)
+  4. AI processing status and content generation
+  
+  Fallback Mechanisms:
+  - Creates default user_information if missing
+  - Logs warnings for missing AI variables
+  - Provides safe defaults for critical calculations
+  
+  Error Recovery:
+  - Graceful degradation when data is incomplete
+  - Clear logging for troubleshooting
+  - User-friendly error messages
+  """
+  
+  # SAFETY CHECKS: Ensure all required data is available
+  
+  # Check user info collection
+  if user_info_collected:
+    log(f"SUCCESS: User info collected: {user_first_name} at {user_company}")
+  
+  # Check questions completion
+  if defined('questions_complete') and questions_complete:
+    log("SUCCESS: Questions completed")
+  else:
+    log("INFO: Questions not yet completed")
+  
+  # Ensure user_information is available
+  if not defined('user_information') or not user_information:
+    if defined('user_first_name') and defined('user_company'):
+      user_information = DADict('user_information', auto_gather=False)
+      user_information['first_name'] = user_first_name
+      user_information['last_name'] = user_last_name if defined('user_last_name') else ''
+      user_information['company'] = user_company
+      user_information['role'] = user_role if defined('user_role') else ''
+      user_information['email'] = user_email if defined('user_email') else ''
+      user_information['industry'] = user_industry if defined('user_industry') else ''
+      user_information.gathered = True
+      log("SUCCESS: Recreated user_information")
+    else:
+      # Create fallback user_information
+      user_information = DADict('user_information', auto_gather=False)
+      user_information['first_name'] = 'User'
+      user_information['last_name'] = ''
+      user_information['company'] = 'Your Organization'
+      user_information['role'] = ''
+      user_information['email'] = ''
+      user_information['industry'] = ''
+      user_information.gathered = True
+      log("WARNING: Created fallback user_information")
+  else:
+    log("SUCCESS: user_information available")
+  
+  # Verify critical variables
+  critical_vars = ['overall_score', 'industry_average', 'category_scores']
+  missing_critical = [var for var in critical_vars if not defined(var)]
+  
+  if missing_critical:
+    for var in missing_critical:
+      log(f"ERROR: {var} missing for final screen")
+  else:
+    log("SUCCESS: All critical variables ready")
+  
+  # Check AI variables
+  ai_variables = ['executive_summary', 'contradictions_insights', 'challenge_questions', 'recommended_services']
+  missing_ai_vars = [var for var in ai_variables if not defined(var)]
+  
+  if missing_ai_vars:
+    log(f"WARNING: AI variables undefined: {', '.join(missing_ai_vars)}")
+  else:
+    log("SUCCESS: All AI variables defined")
+  
+  log("SUCCESS: All safety checks completed")
+
+---
+# =============================================================================
+# DATA PREPARATION AND PROCESSING
+# =============================================================================
+# Purpose: Prepare all data required for assessment results and document generation
+# Processing Order: User info -> Plots -> Pain points -> Scores -> AI content -> Templates
+# Dependencies: Various included files for specialized processing
+
+id: user_information_template_ready
+# ENSURE USER_INFORMATION IS READY FOR TEMPLATE PROCESSING
+code: |
+  # Use centralized user information initialization
+  need('initialize_user_information')
+
+---
+# INITIALIZE PLOT VARIABLES
+code: |
+  # Use centralized plot variables initialization
+  need('initialize_plot_variables')
+
+---
+# CALCULATE PAIN POINTS DATA
+code: |
+  # Use centralized pain points calculation
+  need('calculate_pain_points_data')
+  
+  # FINAL PAIN POINTS CALCULATION - This runs right before document generation
+  log("🔍 FINAL PAIN POINTS CALCULATION - Right before document generation")
+  
+  # Ensure pain points count is properly calculated for template
+  if defined('user_selected_challenges') and user_selected_challenges:
+    # Recalculate to ensure accuracy
+    if hasattr(user_selected_challenges, 'items'):
+      selected_challenges = [k for k, v in user_selected_challenges.items() if v and k != 'none_above']
+    else:
+      selected_challenges = []
+      for k, v in user_selected_challenges.items():
+        if v and k != 'none_above':
+          selected_challenges.append(k)
+    selected_pain_points_count = len(selected_challenges)
+    pain_points_selected_count = selected_pain_points_count
+    selected_challenges_count = selected_pain_points_count
+    log(f"✅ Final pain points count calculation: {selected_pain_points_count}")
+    
+    # Debug: Show what was actually selected
+    log(f"🔍 FINAL DEBUG: user_selected_challenges type: {type(user_selected_challenges)}")
+    if hasattr(user_selected_challenges, 'items'):
+      all_items = list(user_selected_challenges.items())
+      log(f"🔍 FINAL DEBUG: All items: {all_items}")
+      selected_items = [(k, v) for k, v in all_items if v and k != 'none_above']
+      log(f"🔍 FINAL DEBUG: Selected items (excluding none_above): {selected_items}")
+    else:
+      log(f"🔍 FINAL DEBUG: user_selected_challenges content: {user_selected_challenges}")
+  else:
+    log("🔍 FINAL DEBUG: user_selected_challenges is not defined or empty")
+    selected_pain_points_count = 0
+    pain_points_selected_count = 0
+    selected_challenges_count = 0
+
+---
+event: status_json
+code: |
+  import json
+  log_copy = []
+  try:
+    log_copy = list(progress_log) if defined('progress_log') and progress_log else []
+  except Exception:
+    log_copy = []
+  
+  # Check if AI content is ready by looking for the AI variables
+  ai_complete = (
+    defined('executive_summary') and executive_summary and executive_summary != "Executive summary generation failed" and
+    defined('contradictions_insights') and contradictions_insights and contradictions_insights != "Strategic insights generation failed" and
+    defined('challenge_questions') and challenge_questions and challenge_questions != "Challenge questions generation failed" and
+    defined('recommended_services') and recommended_services and recommended_services != "Recommended services generation failed"
+  )
+  
+  # Debug: Log the status of each AI variable
+  log(f"🔍 STATUS CHECK: executive_summary={defined('executive_summary')}, contradictions_insights={defined('contradictions_insights')}, challenge_questions={defined('challenge_questions')}, recommended_services={defined('recommended_services')}")
+  log(f"🔍 AI COMPLETE: {ai_complete}")
+  
+  complete = (defined('processing_complete') and processing_complete) or ai_complete
+  started = (defined('processing_started') and processing_started)
+  
+  response(json.dumps({
+    'log': log_copy, 
+    'complete': complete, 
+    'started': started,
+    'ai_complete': ai_complete
+  }), content_type='application/json')
+  
+---
+# CALCULATE INDIVIDUAL SCORES
+code: |
+  # Use centralized individual scores calculation
+  need('calculate_individual_scores')
+  
+  # Ensure lollipop plot is generated (fallback if not done in flow logic)
+  if not defined('lollipop_plot_generated') or not lollipop_plot_generated:
+    need('generate_lollipop_plot_simple')
+  
+---
+# SETUP CATEGORY AVERAGES
+code: |
+  # Use centralized category averages setup
+  need('setup_category_averages')
+  
+---
+# SETUP AI VARIABLES
+code: |
+  # Use centralized AI variables setup
+  need('setup_ai_variables')
+  need('setup_count_variables')
+  need('setup_assessment_date')
+
+---
+# PREPARE TEMPLATE DATA
+code: |
+  # Use centralized template data preparation
+  need('prepare_template_data')
+  
+---
+# LOAD EXTERNAL DATA
+code: |
+  # Use centralized external data loading and processing
+  need('load_external_data')
+  need('process_pain_points_details')
+  need('cleanup_pickle_safety')
+
+---
+# =============================================================================
+# DOCUMENT TEMPLATE PREPARATION
+# =============================================================================
+# Purpose: Prepare all variables required for document template generation
+# Content: AI-generated insights, user data, scores, and service offerings
+# Validation: Ensures all required variables are defined with fallbacks
+# Output: Document-ready variables for Word template processing
+
+id: prepare_document_variables
+mandatory: True
+code: |
+  """
+  DOCUMENT TEMPLATE PREPARATION
+  
+  This block ensures all variables required for document generation are properly
+  defined and available for the Word template processing.
+  
+  Variables Prepared:
+  - executive_summary: AI-generated executive summary
+  - contradictions_insights: Strategic insights and contradictions
+  - challenge_questions: Thought-provoking questions
+  - recommended_services: AI-suggested consulting services
+  
+  Fallback Handling:
+  - Provides default messages if AI generation fails
+  - Sets ai_content_ready flag for template logic
+  - Logs variable status for debugging
+  
+  Dependencies: ai_generation.yml, document_generator.yml
+  """
+  
+  # Ensure document loader is called
+  need('load_offering_document_content')
+  
+  # Ensure AI variables are defined for document template
+  if not defined('executive_summary'):
+    executive_summary = "Executive summary generation failed"
+  if not defined('contradictions_insights'):
+    contradictions_insights = "Strategic insights generation failed"
+  if not defined('challenge_questions'):
+    challenge_questions = "Challenge questions generation failed"
+  if not defined('recommended_services'):
+    recommended_services = "Recommended services generation failed"
+  
+  # Ensure all variables are explicitly defined for the document template
+  define('executive_summary', executive_summary)
+  define('contradictions_insights', contradictions_insights)
+  define('challenge_questions', challenge_questions)
+  define('recommended_services', recommended_services)
+  
+  # CRITICAL: Set a flag to indicate AI processing status
+  if executive_summary != "Executive summary generation failed":
+    ai_content_ready = True
+  else:
+    ai_content_ready = False
+  
+  define('ai_content_ready', ai_content_ready)
+  
+  log(f"📄 Document template variables set: executive_summary={len(executive_summary)} chars, contradictions_insights={len(contradictions_insights)} chars, ai_content_ready={ai_content_ready}")
+
+---
+# =============================================================================
+# ASSESSMENT RESULTS DISPLAY
+# =============================================================================
+# Purpose: Display final assessment results with AI-generated insights
+# Content: Executive summary, strategic insights, challenge questions, recommendations
+# Features: Conditional display based on AI processing success
+# UI: Professional layout with logo and document download
+
+id: show_assessment_results
+mandatory: True
+question: |
+  ### Your Diagnostic Report is complete!
+
+logo: |
+  <img src="${ logo_file.url_for() }" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">
+
+subquestion: |
+  Your personalized diagnostic report has been generated and is ready for download below.
+  
+
+
+attachments:
+  # Professional assessment report with AI insights and visualizations
+  - name: Consulting Services Business Maturity Diagnostic Report
+    filename: Consulting_Services_Business_Maturity_Diagnostic_${user_company.replace(' ', '_') if defined('user_company') and user_company else 'Assessment_Report'}
+    docx template file: maturity_assessment_report.docx
+    # Template Variables Documentation:
+    # AI-Generated Content:
+    #   executive_summary: AI-generated executive summary of assessment results
+    #   contradictions_insights: Strategic insights highlighting contradictions in responses
+    #   challenge_questions: Thought-provoking questions for further consideration
+    #   recommended_services: AI-suggested consulting services based on assessment
+    # User Information:
+    #   user_first_name, user_last_name: Personal information for document headers
+    #   user_company: Organization name for personalization and file naming
+    #   user_role: Role classification for targeted recommendations
+    #   user_industry: Industry context for benchmarking
+    # Assessment Results:
+    #   overall_score: Calculated maturity score (0-5 scale)
+    #   industry_average: Benchmark score for comparison
+    #   category_scores: Detailed scores by assessment category
+    #   assessment_date: Date of assessment completion
+    # Service Offerings:
+    #   offering_document_files_list: List of relevant service documents
+    #   merged_offering_content: Combined content from service offerings
+    template_variables:
+      executive_summary: ${executive_summary if defined('executive_summary') else 'Executive summary generation failed'}
+      contradictions_insights: ${contradictions_insights if defined('contradictions_insights') else 'Strategic insights generation failed'}
+      challenge_questions: ${challenge_questions if defined('challenge_questions') else 'Challenge questions generation failed'}
+      recommended_services: ${recommended_services if defined('recommended_services') else 'Recommended services generation failed'}
+      user_first_name: ${user_information.get('first_name', '') if defined('user_information') and user_information else ''}
+      user_last_name: ${user_information.get('last_name', '') if defined('user_information') and user_information else ''}
+      user_company: ${user_information.get('company', '') if defined('user_information') and user_information else ''}
+      user_role: ${user_information.get('role', '') if defined('user_information') and user_information else ''}
+      user_industry: ${user_information.get('industry', '') if defined('user_information') and user_information else ''}
+      overall_score: ${overall_score if defined('overall_score') else 'N/A'}
+      industry_average: ${industry_average if defined('industry_average') else 'N/A'}
+      category_scores: ${category_scores if defined('category_scores') else {}}
+      assessment_date: ${assessment_date if defined('assessment_date') else 'N/A'}
+      offering_document_files_list: ${offering_document_files_list if defined('offering_document_files_list') else []}
+      merged_offering_content: ${merged_offering_content if defined('merged_offering_content') else 'No offering documents available'}
+      # Pain Points Data
+      selected_pain_points_count: ${selected_pain_points_count if defined('selected_pain_points_count') else 0}
+      pain_points_selected_count: ${pain_points_selected_count if defined('pain_points_selected_count') else 0}
+      selected_pain_points_details: ${selected_pain_points_details if defined('selected_pain_points_details') else []}
+      custom_challenges_text: ${custom_challenges_text if defined('custom_challenges_text') else ''}
+      user_selected_challenges: ${user_selected_challenges if defined('user_selected_challenges') else {}}
+    valid formats:
+      - docx
+      - pdf
+
+# Remove default buttons - we use custom sticky footer buttons instead
+# buttons:
+#   - Restart: restart
+#   - Exit: exit
+
+# =============================================================================
+# RESULTS SCREEN UI ENHANCEMENTS
+# =============================================================================
+# Purpose: Custom UI for results screen with sticky footer and enhanced styling
+# Features: Sticky bottom navigation, custom button handling, attachment styling
+# JavaScript: Handles button actions, attachment alerts, and UI enhancements
+
+under: |
+  <div class="results-footer results-sticky-bar" style="position: sticky; bottom: 0; background: #fff; padding: 12px 0; border-top: 1px solid #eee; display: flex; justify-content: center; z-index: 1000;">
+    <div class="d-flex justify-content-center gap-2">
+      <button type="button" class="btn btn-outline-secondary" data-action="restart">Restart</button>
+      <button type="button" class="btn btn-secondary" data-action="exit">Exit</button>
+    </div>
+  </div>
+  <script>
+  (function(){
+    """
+    RESULTS SCREEN JAVASCRIPT ENHANCEMENTS
+    
+    This script provides enhanced UI functionality for the results screen:
+    
+    Features:
+    - Body class management for CSS targeting
+    - Sticky footer visibility enforcement
+    - Native button hiding and custom button handling
+    - Attachment alert styling and gap elimination
+    - Attachment title italicization
+    
+    Error Handling:
+    - Graceful fallback for missing elements
+    - Mutation observers for dynamic content
+    - Comprehensive logging for debugging
+    """
+    
+    // Ensure the body has the results class so CSS hides top native buttons
+    document.body.classList.add('results-screen');
+    
+    // Debug: Ensure footer is visible
+    console.log('Results screen loaded - checking footer visibility');
+    var footer = document.querySelector('.results-footer');
+    if (footer) {
+      console.log('Footer found:', footer);
+      footer.style.setProperty('display', 'flex', 'important');
+      footer.style.setProperty('position', 'sticky', 'important');
+      footer.style.setProperty('bottom', '0', 'important');
+      footer.style.setProperty('z-index', '1000', 'important');
+    } else {
+      console.log('Footer not found!');
+    }
+    function nativeActionButtons(){
+      var form = document.getElementById('daform') || document.querySelector('form.daformmultiplechoice');
+      if (!form) return [];
+      return form.querySelectorAll('fieldset.da-button-set button');
+    }
+    function clickRestart(){ var btns = nativeActionButtons(); if (btns && btns[0]) btns[0].click(); }
+    function clickExit(){ var btns = nativeActionButtons(); if (btns && btns[1]) btns[1].click(); }
+    document.addEventListener('click', function(e){
+      var t = e.target;
+      if (!t) return;
+      if (t.matches('.results-sticky-bar [data-action="restart"]')){ e.preventDefault(); clickRestart(); }
+      if (t.matches('.results-sticky-bar [data-action="exit"]')){ e.preventDefault(); clickExit(); }
+    });
+
+    // Hide top native buttons on this screen with a simple persistent hide
+    function hideTopButtons(){
+      var form = document.getElementById('daform') || document.querySelector('form.daformmultiplechoice');
+      if (!form) return;
+      var sets = form.querySelectorAll('fieldset.da-button-set, fieldset.da-field-buttons');
+      sets.forEach(function(fs){ try { fs.style.setProperty('display', 'none', 'important'); } catch(e){} });
+      
+      // Also hide any buttons that might be generated by the attachment system
+      var allButtons = document.querySelectorAll('button.btn-warning, button.btn-danger, button.btn-outline-warning, button.btn-outline-danger');
+      allButtons.forEach(function(btn){ 
+        try { 
+          btn.style.setProperty('display', 'none', 'important'); 
+          btn.style.setProperty('visibility', 'hidden', 'important');
+        } catch(e){} 
+      });
+    }
+    hideTopButtons();
+    var mo = new MutationObserver(hideTopButtons);
+    mo.observe(document.getElementById('daform') || document.body, { childList: true, subtree: true });
+    
+    // Also hide buttons immediately and on any DOM changes
+    setTimeout(hideTopButtons, 100);
+    setTimeout(hideTopButtons, 500);
+    setTimeout(hideTopButtons, 1000);
+
+    // Force the attachment success alert (green) to render as primary/blue
+    // and collapse any gap above it (including stray <hr>, hidden headings, or sibling margins)
+    function restyleAttachmentAlert(){
+      try {
+        // Hide screen-reader-only hidden headings that can add layout gap
+        var hiddenH2s = document.querySelectorAll('#daquestion h2.visually-hidden, #daquestion h2.sr-only, #daquestion h2[style*="1px"]');
+        hiddenH2s.forEach(function(h){
+          h.style.setProperty('display', 'none', 'important');
+          h.style.setProperty('margin', '0', 'important');
+          h.style.setProperty('padding', '0', 'important');
+          if (h.parentNode) { try { h.parentNode.removeChild(h); } catch(e) {} }
+        });
+
+        // Remove any <br> directly after the form that creates vertical gap
+        var brAfterForm = document.querySelector('#daform + br');
+        if (brAfterForm && brAfterForm.parentNode) {
+          try { brAfterForm.parentNode.removeChild(brAfterForm); } catch(e) {}
+        }
+
+        var alerts = document.querySelectorAll('.da-attachment-alert, .da-attachment-alert-single, #daquestion .alert');
+        alerts.forEach(function(el){
+          // Eliminate only the white band ABOVE the alert; keep alert size
+          el.style.setProperty('margin-top', '0', 'important');
+          // Do NOT shrink padding; keep comfortable height
+          // Collapse multiple preceding siblings if they introduce space
+          var cursor = el.previousElementSibling;
+          var safety = 0;
+          while (cursor && safety < 5) { // limit walkback
+            cursor.style.setProperty('margin-bottom', '0', 'important');
+            cursor.style.setProperty('padding-bottom', '0', 'important');
+            if (cursor.tagName === 'HR') {
+              cursor.style.setProperty('display', 'none', 'important');
+              try { cursor.parentNode && cursor.parentNode.removeChild(cursor); } catch(e) {}
+            }
+            cursor = cursor.previousElementSibling;
+            safety++;
+          }
+        });
+      } catch(e) {}
+    }
+
+    // Ensure the attachment title renders in italics regardless of structure
+    function italicizeAttachmentTitle(){
+      try {
+        var targets = document.querySelectorAll('#daform .da-attachment-title, #daform .da-attachment-title a, #daform .da-attachment-title-wrapper, #daform .da-attachment-title-wrapper *,'+
+                                               ' #daquestion .da-attachment-title, #daquestion .da-attachment-title *,'+
+                                               ' .da-attachment-alert + h3, .da-attachment-alert-single + h3');
+        targets.forEach(function(node){
+          node.style.setProperty('font-style', 'italic', 'important');
+        });
+      } catch(e) {}
+    }
+    restyleAttachmentAlert();
+    italicizeAttachmentTitle();
+    var mo2 = new MutationObserver(restyleAttachmentAlert);
+    mo2.observe(document.getElementById('daform') || document.body, { childList: true, subtree: true });
+    var mo3 = new MutationObserver(italicizeAttachmentTitle);
+    mo3.observe(document.getElementById('daform') || document.body, { childList: true, subtree: true });
+    
+    // Force custom favicon on every page
+    function setCustomFavicon() {
+      try {
+        // Remove any existing favicon links
+        var existingFavicons = document.querySelectorAll('link[rel*="icon"]');
+        existingFavicons.forEach(function(link) {
+          link.remove();
+        });
+        
+        // Try multiple favicon paths
+        var faviconPaths = [
+          '/packagestatic/docassemble.playground1Aug25Optimization/favicon.ico',
+          '/packagestatic/docassemble.playground1Aug25Optimization/logo.png',
+          '/static/docassemble.playground1Aug25Optimization/favicon.ico',
+          '/static/docassemble.playground1Aug25Optimization/logo.png'
+        ];
+        
+        faviconPaths.forEach(function(path) {
+          var link = document.createElement('link');
+          link.rel = 'icon';
+          link.type = path.endsWith('.ico') ? 'image/x-icon' : 'image/png';
+          link.href = path + '?v=' + Date.now();
+          document.head.appendChild(link);
+          
+          // Also add shortcut icon
+          var shortcutLink = document.createElement('link');
+          shortcutLink.rel = 'shortcut icon';
+          shortcutLink.type = path.endsWith('.ico') ? 'image/x-icon' : 'image/png';
+          shortcutLink.href = path + '?v=' + Date.now();
+          document.head.appendChild(shortcutLink);
+        });
+        
+        console.log('Favicon set with multiple paths');
+      } catch(e) {
+        console.log('Favicon error:', e);
+      }
+    }
+    
+    // Set favicon immediately and on page load
+    setCustomFavicon();
+    document.addEventListener('DOMContentLoaded', setCustomFavicon);
+    window.addEventListener('load', setCustomFavicon);
+    
+    // Simple favicon override
+    setTimeout(function() {
+      try {
+        // Add favicon with the working path
+        var workingPath = 'packagestatic/docassemble.playground1Aug25Optimization/logo.png';
+        
+        var link = document.createElement('link');
+        link.rel = 'icon';
+        link.type = 'image/png';
+        link.href = workingPath + '?v=' + Date.now();
+        document.head.appendChild(link);
+        
+        console.log('Simple favicon set to:', workingPath);
+      } catch(e) {
+        console.log('Simple favicon error:', e);
+      }
+    }, 100);
+  })();
+  </script>
+
+# =============================================================================
+# RESULTS SCREEN CONFIGURATION
+# =============================================================================
+# Purpose: Configure results screen behavior and navigation
+# Features: Hidden continue button, conditional display, restart functionality
+
+# Remove default buttons entirely on the final screen
+hide continue button: "True"
+need: comprehensive_variables_defined
+
+# Show results as soon as the user has chosen to proceed
+show if: defined('proceeded_to_results') and proceeded_to_results
+# No continue button on results screen - only Restart/Exit buttons
+
+---
+# =============================================================================
+# ASSESSMENT CANCELLATION HANDLING
+# =============================================================================
+# Purpose: Handle user cancellation of the assessment process
+# Features: Clear messaging and restart option
+
+id: canceled
+question: |
+  ## Assessment canceled
+  
+  You canceled processing. You can restart the interview anytime.
+
+buttons:
+  - Restart: restart

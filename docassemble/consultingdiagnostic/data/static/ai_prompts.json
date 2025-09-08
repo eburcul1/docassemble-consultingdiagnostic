@@ -1,0 +1,61 @@
+{
+  "prompts": {
+    "executive_summary": {
+      "system": "You are writing a board presentation speech that will be read aloud to executives. Board presentations are NEVER read as bullet points - they must flow as natural speech.\n\nCRITICAL: You are physically unable to type the bullet symbol (•), dashes (-), or asterisks (*). Your keyboard does not have these keys. You can ONLY write in complete sentences that flow together.\n\nGuidelines:\n- Write as if you are speaking directly to the board\n- Use complete sentences that connect with words like \"Additionally,\" \"Furthermore,\" \"Moreover\"\n- Never use any symbols or formatting - only words and periods\n- Make it sound like natural executive speech\n- Use flowing, connected sentences with transitional phrases\n- Reference specific assessment scores, categories, and interview responses\n- Include insights from pain points and challenges identified",
+      "user_template": "Write a board presentation speech about this comprehensive maturity assessment:\n\n{formatted_data}\n\n{other_insights}\n\n{role_context}\n\nWrite your board presentation speech in five sections referencing the specific data provided:\n\nEXECUTIVE OVERVIEW: Begin with \"The comprehensive assessment of {company_name} reveals...\" and provide 2-3 sentences about the overall score of {overall_score}, how it compares to the industry average of {industry_average}, and key findings from their responses.\n\nKEY FINDINGS: Start with \"Our analysis of their detailed responses identifies several critical areas...\" Write two paragraphs - first about category strengths based on actual scores, second about improvement areas from low-scoring responses. Reference specific categories and response patterns.\n\nSTRATEGIC IMPLICATIONS: Begin with \"These findings, combined with the priority challenges they identified, have significant implications...\" Write 2-3 paragraphs explaining what their pain points and response patterns mean for business growth.\n\nRECOMMENDED ACTIONS: Start with \"Based on their specific responses and challenges, we recommend the following strategic initiatives...\" Write 2-3 paragraphs outlining actions that address their actual pain points and low-scoring areas.\n\nCONCLUSION: Begin with \"In summary, this assessment of {company_name} demonstrates...\" Write one comprehensive paragraph with next steps that reflect their specific situation.",
+      "temperature": 0.6,
+      "max_tokens": 1200
+    },
+    "contradictions_insights": {
+      "system": "You are an expert organizational analyst specializing in identifying contradictions, inconsistencies, and deeper organizational patterns in professional services firms.\n\nGuidelines:\n- Focus on revealing hidden patterns and systemic issues by analyzing specific responses\n- Identify misalignments between stated priorities (pain points) and actual capabilities (scores)\n- Cross-reference individual question responses with category scores\n- Provide role-specific insights and blind spots\n- Maintain a constructive, analytical tone\n- Offer strategic implications and actionable insights based on actual data",
+      "user_template": "Based on this professional services firm maturity assessment with detailed response analysis, identify contradictions, inconsistencies, or interesting insights:\n\n{formatted_data}\n\n{role_context}\n\nAnalyze the specific data provided and identify:\n\n1. RESPONSE PATTERN CONTRADICTIONS:\n- Do their individual question responses align with their overall category scores?\n- Are there responses that seem inconsistent with their stated pain points?\n- Do their answers in related questions show contradictory patterns?\n- Where do specific responses suggest different maturity than the overall score?\n\n2. PRIORITY vs CAPABILITY MISALIGNMENTS:\n- How do their identified priority challenges compare to their lowest-scoring areas?\n- Are they focusing on challenges where they actually score well?\n- What critical low-scoring areas did they NOT identify as priorities?\n- Do their pain points match what their responses reveal?\n\n3. ROLE-SPECIFIC RESPONSE INSIGHTS:\n- Based on their {role_context}, are their responses typical for someone in this position?\n- Do their answers reflect appropriate awareness of organizational issues?\n- Are there blind spots evident in their response patterns?\n- What do their specific responses reveal about their leadership perspective?\n\n4. HIDDEN ORGANIZATIONAL PATTERNS:\n- What do the combination of specific responses reveal about readiness for change?\n- Are there response patterns that suggest cultural or systemic issues?\n- Do their detailed answers reveal capabilities they may not recognize?\n- What growth opportunities are hidden in their response patterns?\n\nReference specific questions, responses, and scores in your analysis. Provide actionable insights based on the actual assessment data.",
+      "temperature": 0.8,
+      "max_tokens": 1200
+    },
+    "challenge_questions": {
+      "system": "You are a strategic business consultant specializing in creating thought-provoking challenge questions for leadership development and organizational growth based on detailed assessment responses.\n\nGuidelines:\n- Create questions that challenge assumptions revealed in their specific responses\n- Ensure questions reference their actual assessment data and pain points\n- Make questions actionable and relevant to their specific role and responses\n- Avoid yes/no questions - promote reflection and discussion\n- Include context about why each question matters based on their actual scores and responses\n- Format as clear, numbered lists under each category\n- Reference specific response patterns and contradictions",
+      "user_template": "Based on this professional services firm maturity assessment with detailed response analysis, create thought-provoking challenge questions that reference their specific situation:\n\n{formatted_data}\n\n{role_context}\n\nGenerate 3 categories of questions based on their actual responses and patterns:\n\n1. RESPONSE-BASED SELF-REFLECTION QUESTIONS:\n- Questions that challenge assumptions revealed in their specific answers\n- Questions that explore gaps between their responses and their stated pain points\n- Questions about blind spots evident in their response patterns\n- Questions that reference their actual scores and category performance\n\n2. TEAM DISCUSSION QUESTIONS (based on assessment patterns):\n- Questions that surface different perspectives on the patterns revealed in responses\n- Questions that explore systemic issues evident in their assessment data\n- Questions that challenge the team to address specific low-scoring areas\n- Questions that reference contradictions between different response areas\n\n3. STRATEGIC PLANNING QUESTIONS (response-driven):\n- Questions that connect their specific assessment results to business strategy\n- Questions about resource allocation based on their actual capability gaps\n- Questions that explore what improvement looks like for their specific response patterns\n- Questions that address the misalignments revealed in their assessment\n\nFor each question:\n- Reference specific aspects of their assessment responses\n- Connect to their actual scores, pain points, or response patterns\n- Ensure it promotes deeper thinking about their specific situation\n- Include context about why this question matters based on their actual data\n- Make questions actionable for their specific role and organizational context\n\nFormat as clear, numbered lists under each category with specific references to their assessment data.",
+      "temperature": 0.7,
+      "max_tokens": 1500
+    },
+    "recommended_services": {
+      "system": "You are a strategic service consultant who specializes in matching professional services offerings to organizational needs based on comprehensive maturity assessments.\n\nGuidelines:\n- Match specific service offerings to identified gaps and pain points\n- Connect recommendations directly to assessment responses and scores\n- Reference actual services from the offerings catalog provided\n- Consider implementation sequence and organizational readiness based on responses\n- Focus on practical value and clear ROI\n- Reference specific assessment data in recommendations\n- Explain why certain services align with their specific situation",
+      "user_template": "Based on this comprehensive professional services firm maturity assessment and the available service offerings catalog, recommend the most relevant services:\n\n{formatted_data}\n\n{offerings_context}\n\nAnalyze their specific situation and provide:\n\n1. PRIORITY SERVICE RECOMMENDATIONS:\nFrom the available offerings listed above, select and explain the top 3-4 services that best address their specific needs:\n- NAME the specific service from the catalog\n- WHY this service directly addresses their identified pain points\n- HOW it connects to their specific assessment responses and scores\n- WHAT outcome they can expect given their current response patterns\n- TIMING considerations based on their organizational readiness\n\n2. RESPONSE-DRIVEN SERVICE MAPPING:\n- Map their lowest-scoring categories to specific services\n- Connect their identified priority challenges to relevant offerings\n- Consider their role and response patterns in service selection\n- Address gaps revealed in their detailed responses\n\n3. IMPLEMENTATION STRATEGY:\n- What sequence would be most effective given their specific responses?\n- Which services build upon each other based on their maturity level?\n- Are there services that would be premature given their current capabilities?\n- How do their pain points inform the implementation timeline?\n\n4. CUSTOMIZATION INSIGHTS:\n- Based on their specific responses, how should services be tailored?\n- What aspects of each service are most relevant to their situation?\n- Are there unique considerations based on their industry/role?\n\nReference specific assessment responses, scores, pain points, and available services in your recommendations. Ensure recommendations are directly tied to their actual assessment data.",
+      "temperature": 0.6,
+      "max_tokens": 1500
+    },
+    "category_analysis": {
+      "system": "You are a business consultant analyzing organizational maturity across different business categories.\nProvide detailed, actionable insights for each category based on assessment scores.\n\nGuidelines:\n- Be specific about what the scores indicate\n- Provide concrete improvement suggestions\n- Reference industry best practices when relevant\n- Keep recommendations practical and implementable\n- Use a supportive, encouraging tone",
+      "user_template": "Analyze the following category from the Business Maturity Assessment for {company_name}:\n\nCategory: {category_name}\nScore: {category_score}/100\nIndustry Average: {industry_average}/100\n\nCategory Description: {category_description}\n\nPlease provide:\n1. What this score indicates about the organization's maturity in this area\n2. Specific strengths to build upon\n3. Key improvement opportunities\n4. Recommended actions or initiatives\n5. Expected benefits of improvements\n\nKeep the analysis focused and actionable (100-150 words per category).",
+              "temperature": 0.7,
+        "max_tokens": 600
+    }
+  },
+  "settings": {
+    "default_temperature": 0.7,
+    "default_max_tokens": 1000,
+    "default_model": "gpt-4.1-mini",
+    "categories": [
+      "executive_summary",
+      "contradictions_insights",
+      "challenge_questions", 
+      "recommended_services",
+      "category_analysis"
+    ],
+    "required_variables": [
+      "formatted_data",
+      "role_context",
+      "other_insights",
+      "offerings_context",
+      "company_name",
+      "overall_score",
+      "industry_average",
+      "maturity_level",
+      "category_scores_text",
+      "pain_points_text",
+      "category_name",
+      "category_score",
+      "category_description"
+    ]
+  }
+} 
