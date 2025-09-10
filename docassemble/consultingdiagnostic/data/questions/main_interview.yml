@@ -1,20 +1,20 @@
 ---
 metadata:
-  title: Consulting Services Business Maturity Diagnostic
-  short title: Diagnostic
-  version: 1.0 
+  title: Consulting Services Diagnostic
+  short title: 
+  version: "1.0.0"
   description: |
-    Complete diagnostic system for consulting services business maturity assessment.
+    Complete diagnostic system for consulting services.
     
     Features:
     - User information collection and validation
     - Dynamic question loading from CSV with 25 assessment questions
-    - Real-time scoring and industry benchmarking (industry score from question file)
+    - Real-time scoring and industry benchmarking
     - AI-powered insights generation using OpenAI
-    - Output generation with Word template
-    - visualizations (radar and lollipop charts)
+    - Professional report generation with Word templates
+    - Visualizations (radar and lollipop charts)
     - Pain points analysis and service recommendations
-    - Document generation augmented with offering-specific content (inserted from static files)
+    - Document generation with offering-specific content
     
     Architecture:
     - Modular design with separated concerns
@@ -92,12 +92,12 @@ metadata:
     - document-generation
   exit link: off
   logo: |
-    <img src="/packagestatic/docassemble.playground1Sept4demo/logo.png" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">
+    <img src="/packagestatic/docassemble.playground1Sept9AgenticImprovements/logo.png" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">
   
   head: |
-    <link rel="icon" type="image/png" href="packagestatic/docassemble.playground1Sept4demo/logo.png">
-    <link rel="shortcut icon" type="image/png" href="packagestatic/docassemble.playground1Sept4demo/logo.png">
-    <link rel="apple-touch-icon" type="image/png" href="packagestatic/docassemble.playground1Sept4demo/logo.png">
+    <link rel="icon" type="image/png" href="packagestatic/docassemble.playground1Sept9AgenticImprovements/logo.png">
+    <link rel="shortcut icon" type="image/png" href="packagestatic/docassemble.playground1Sept9AgenticImprovements/logo.png">
+    <link rel="apple-touch-icon" type="image/png" href="packagestatic/docassemble.playground1Sept9AgenticImprovements/logo.png">
   
   footer: |
     <div class="ve-footer">
@@ -107,6 +107,7 @@ metadata:
 ---
 include:
   - config.yml  # Configuration constants (NEW)
+  - assessment_intelligence_agent.yml  # Phase 1: Assessment Intelligence Agent
   - variables.yml
   - data_loader.yml
   - questions.yml
@@ -378,7 +379,7 @@ code: |
       selected_pain_points_count = 0
       pain_points_selected_count = 0
       selected_challenges_count = 0
-    
+
     need('show_assessment_results')
 
 ---

@@ -44,13 +44,13 @@ def find_package_data(where='.', package='', exclude=standard_exclude, exclude_d
     return out
 
 setup(name='docassemble.consultingdiagnostic',
-      version='0.0.1',
-      description=('A docassemble extension.'),
-      long_description='launch from main_interview.yml\r\nrequires an OpenAI key in config file for AI gen',
+      version='0.0.2',
+      description=('A docassemble extension. assessment_intelligence (hardcoded)'),
+      long_description='launch from main_interview.yml\r\nrequires an OpenAI key in config file for AI gen\r\nIntroduces assessment_intelligenct_agent to mimic agentic AI for question context(but it all hardcoded)',
       long_description_content_type='text/markdown',
       author='System Administrator',
       author_email='burcul_elvis@hotmail.com',
-      license='MIT',
+      license='',
       url='https://docassemble.org',
       packages=find_namespace_packages(),
       install_requires=['matplotlib>=3.10.5', 'openai>=1.86.0'],

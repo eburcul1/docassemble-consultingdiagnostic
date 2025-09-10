@@ -10,6 +10,22 @@ body.processing-screen.show-continue form input[type="submit"] {
   display: inline-block !important;
 }
 
+/* Help Panel - Hide original Back to Question button */
+#daquestionhelp .btn:first-child,
+#daquestionhelp button:first-child,
+.da-help-panel .btn:first-child,
+.da-help-panel button:first-child {
+  display: none !important;
+}
+
+/* Hide any button that appears at the top of help panel */
+#daquestionhelp > .btn,
+#daquestionhelp > button,
+.da-help-panel > .btn,
+.da-help-panel > button {
+  display: none !important;
+}
+
 /* Assessment System Styles */
 .assessment-card {
   background: #f8f9fa;
@@ -486,5 +502,233 @@ body.results-screen #daquestion .da-attachment-title *,
 body.results-screen .da-attachment-alert + h3,
 body.results-screen .da-attachment-alert-single + h3 {
   font-style: italic !important;
+}
+
+/* =============================================================================
+   ASSESSMENT INTELLIGENCE AGENT - PHASE 1
+   =============================================================================
+   Purpose: Style the Assessment Intelligence Agent blue box content
+   Usage: Applied to intelligent agent insights and guidance during assessment
+   Dependencies: Bootstrap alert classes, custom agent content
+   ============================================================================= */
+
+/* Intelligence Agent Blue Box Container - Right Column Layout */
+.intelligence-agent-box {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border: 2px solid #2196f3;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15);
+  position: relative;
+  overflow: hidden;
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.intelligence-agent-box::before {
+  content: "🤖";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 1.1rem;
+  opacity: 0.7;
+}
+
+/* Agent Content Sections - Compact for Right Column */
+.agent-explanation,
+.agent-industry-insight,
+.agent-role-guidance,
+.agent-pattern-analysis,
+.agent-consistency-check {
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  border-left: 3px solid #2196f3;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.agent-explanation:last-child,
+.agent-industry-insight:last-child,
+.agent-role-guidance:last-child,
+.agent-pattern-analysis:last-child,
+.agent-consistency-check:last-child {
+  margin-bottom: 0;
+}
+
+/* Agent Content Typography */
+.intelligence-agent-box strong {
+  color: #1565c0;
+  font-weight: 600;
+}
+
+.intelligence-agent-box ul {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+.intelligence-agent-box li {
+  margin-bottom: 0.25rem;
+  color: #424242;
+  line-height: 1.4;
+}
+
+/* Agent Content Icons */
+.agent-explanation::before {
+  content: "💡 ";
+  font-size: 1.1rem;
+}
+
+.agent-industry-insight::before {
+  content: "🏢 ";
+  font-size: 1.1rem;
+}
+
+.agent-role-guidance::before {
+  content: "👤 ";
+  font-size: 1.1rem;
+}
+
+.agent-pattern-analysis::before {
+  content: "📊 ";
+  font-size: 1.1rem;
+}
+
+.agent-consistency-check::before {
+  content: "🔍 ";
+  font-size: 1.1rem;
+}
+
+/* Responsive Design for Intelligence Agent */
+@media (max-width: 768px) {
+  .intelligence-agent-box {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .intelligence-agent-box::before {
+    top: 0.5rem;
+    right: 0.5rem;
+    font-size: 1.25rem;
+  }
+  
+  .agent-explanation,
+  .agent-industry-insight,
+  .agent-role-guidance,
+  .agent-pattern-analysis,
+  .agent-consistency-check {
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+}
+
+/* Intelligence Agent Animation */
+.intelligence-agent-box {
+  animation: slideInFromTop 0.5s ease-out;
+}
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Intelligence Agent Hover Effects */
+.intelligence-agent-box:hover {
+  box-shadow: 0 6px 20px rgba(33, 150, 243, 0.2);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+/* Intelligence Agent Focus States for Accessibility */
+.intelligence-agent-box:focus-within {
+  outline: 2px solid #2196f3;
+  outline-offset: 2px;
+}
+
+/* Context Button Styling */
+.context-button {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.context-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+/* AI Context Panel */
+.ai-context-panel {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  animation: slideDown 0.3s ease-out;
+}
+
+/* Add white space above help content */
+.help-content {
+  padding-top: 5rem !important;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Compact Intelligence Agent for Context Panel */
+.ai-context-panel .intelligence-agent-box {
+  margin-bottom: 0;
+  font-size: 0.85rem;
+  padding: 0.8rem;
+  border-radius: 8px;
+}
+
+.ai-context-panel .agent-explanation,
+.ai-context-panel .agent-industry-insight,
+.ai-context-panel .agent-role-guidance,
+.ai-context-panel .agent-pattern-analysis,
+.ai-context-panel .agent-consistency-check {
+  margin-bottom: 0.6rem;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+  
+  .intelligence-agent-box {
+    margin-bottom: 0;
+    font-size: 0.8rem;
+    padding: 0.6rem;
+  }
+  
+  .intelligence-agent-box::before {
+    top: 0.4rem;
+    right: 0.4rem;
+    font-size: 1rem;
+  }
+  
+  .agent-explanation,
+  .agent-industry-insight,
+  .agent-role-guidance,
+  .agent-pattern-analysis,
+  .agent-consistency-check {
+    padding: 0.4rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.75rem;
+    line-height: 1.25;
+  }
 }
 

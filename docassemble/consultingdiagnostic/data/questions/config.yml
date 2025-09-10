@@ -1,19 +1,46 @@
 ---
+# =============================================================================
+# CONFIGURATION CONSTANTS - CENTRALIZED SYSTEM CONFIGURATION
+# =============================================================================
+# Purpose: Centralized configuration management for all system constants and settings
+# Input: CSV data files, system defaults, user preferences
+# Output: Global configuration variables accessible throughout the assessment system
+# Usage: Eliminates hardcoded values and provides single source of truth for all settings
+# Dependencies: FinalQuestionsIDwScore.csv for industry averages
+
 metadata:
   title: Configuration Constants
   description: Centralized configuration for all hardcoded values and constants
 
 ---
 # =============================================================================
-# ASSESSMENT CONFIGURATION CONSTANTS
+# INDUSTRY AVERAGES LOADER
 # =============================================================================
+# Purpose: Load industry benchmark data from CSV file for comparison
+# Input: FinalQuestionsIDwScore.csv file with IndustryNormScore column
+# Output: industry_averages dictionary with benchmark values
+# Usage: Provides industry benchmarks for user performance comparison
+# Dependencies: FinalQuestionsIDwScore.csv must exist in package
 
----
 id: load_configuration_constants
 code: |
   """
-  Load all configuration constants from external sources or set defaults.
-  This eliminates hardcoded values throughout the codebase.
+  INDUSTRY AVERAGES LOADER
+  
+  This block loads industry benchmark data from the CSV file to provide
+  context for user performance comparison. It extracts the IndustryNormScore
+  values and makes them available throughout the assessment system.
+  
+  Data Source:
+  - FinalQuestionsIDwScore.csv: Contains industry norm scores for each question
+  
+  Output:
+  - industry_averages: Dictionary with benchmark values for comparison
+  - industry_averages_loaded: Flag to prevent duplicate loading
+  
+  Error Handling:
+  - Graceful fallback to default value (2.18) if CSV loading fails
+  - Logs errors for debugging while maintaining system functionality
   """
   log("⚙️ Loading configuration constants...")
   
@@ -23,9 +50,11 @@ code: |
       import csv
       from docassemble.base.util import path_and_mimetype
       
+      # Initialize industry averages dictionary
       industry_averages = {}
       file_path, _ = path_and_mimetype('FinalQuestionsIDwScore.csv')
       
+      # Read CSV file and extract industry norm scores
       with open(file_path, encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -43,37 +72,58 @@ code: |
         industry_averages['default'] = 2.18  # Fallback default
         log("⚠️ No industry averages found in CSV, using fallback: 2.18")
       
+      # Define global variables for system-wide access
       define('industry_averages', industry_averages)
       industry_averages_loaded = True
       log(f"✅ Industry averages loaded: {industry_averages}")
       
     except Exception as e:
       log(f"❌ Failed to load industry averages: {e}")
-      # Set safe defaults
+      # Set safe defaults to ensure system continues to function
       industry_averages = {'default': 2.18}
       define('industry_averages', industry_averages)
       industry_averages_loaded = True
 
 ---
 # =============================================================================
-# PROCESSING CONFIGURATION
+# PROCESSING SCREEN CONFIGURATION
 # =============================================================================
+# Purpose: Configure processing screen timing, progress steps, and background task settings
+# Input: System timing requirements and user experience preferences
+# Output: Processing timing variables and progress step definitions
+# Usage: Controls the processing screen display and background task management
+# Dependencies: None - standalone configuration
 
----
 id: processing_config
 code: |
   """
-  Processing screen and background task configuration.
+  PROCESSING SCREEN CONFIGURATION
+  
+  This block configures all aspects of the processing screen including:
+  - Timing for progress bar animation and step transitions
+  - Background task timeout and polling intervals
+  - Progress step messages and timing
+  
+  User Experience:
+  - 60-second total processing time with 10-second step intervals
+  - 6 progress steps with descriptive messages
+  - Background AI task timeout of 2 minutes with 5-second polling
+  
+  Technical Settings:
+  - All timing values in milliseconds for UI consistency
+  - Background task settings for reliable AI processing
+  - Progress steps array for dynamic UI updates
   """
+  
   # Processing screen timing (milliseconds)
-  processing_total_ms = 60000  # 60 seconds
-  processing_step_interval = 10000  # 10 seconds per step
+  processing_total_ms = 60000  # 60 seconds total processing time
+  processing_step_interval = 10000  # 10 seconds per progress step
   
-  # Background task timeouts
-  ai_task_timeout_seconds = 120  # 2 minutes max
-  background_poll_interval = 5  # Check every 5 seconds
+  # Background task timeouts and polling
+  ai_task_timeout_seconds = 120  # 2 minutes maximum for AI processing
+  background_poll_interval = 5  # Check background task every 5 seconds
   
-  # Progress steps configuration
+  # Progress steps configuration with timing and messages
   progress_steps = [
     {'t': 0, 'msg': 'Initializing Analysis Engine…'},
     {'t': 10000, 'msg': 'Loading responses…'},
@@ -83,6 +133,7 @@ code: |
     {'t': 50000, 'msg': 'Generating Executive Summary…'}
   ]
   
+  # Define global variables for system-wide access
   define('processing_total_ms', processing_total_ms)
   define('processing_step_interval', processing_step_interval)
   define('ai_task_timeout_seconds', ai_task_timeout_seconds)
@@ -93,13 +144,36 @@ code: |
 # =============================================================================
 # ASSESSMENT FORMATTING CONFIGURATION
 # =============================================================================
+# Purpose: Configure question choice formatting and scoring level mapping
+# Input: User preference for choice display style and scoring requirements
+# Output: Level mapping, choice formatting, and display style variables
+# Usage: Controls how question choices are displayed and how answers are scored
+# Dependencies: None - standalone configuration
 
----
 id: formatting_config
 code: |
   """
-  Assessment formatting and display configuration.
+  ASSESSMENT FORMATTING CONFIGURATION
+  
+  This block configures how question choices are displayed and how user
+  responses are converted to numeric scores for analysis and visualization.
+  
+  Choice Display Options:
+  - "letter": A: description, B: description, C: description, etc.
+  - "number": 1: description, 2: description, 3: description, etc.
+  - "none": Just the description text without any prefix
+  
+  Scoring System:
+  - Maps letter choices (A, B, C, D, E) to numeric scores (0, 1, 2, 3, 4)
+  - A=0 (lowest maturity), E=4 (highest maturity)
+  - Used consistently throughout scoring, visualization, and analysis
+  
+  System Integration:
+  - Used by questions.yml for choice formatting
+  - Used by scoring.yml for answer conversion
+  - Used by visualization files for data processing
   """
+  
   # Level prefix style for question choices
   level_prefix_style = "letter"  # Options: "letter", "number", "none"
   
@@ -114,9 +188,10 @@ code: |
     'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4
   }
   
-  # Letter choices for formatting
+  # Letter choices for formatting - supports up to 10 levels
   letter_choices = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
   
+  # Define global variables for system-wide access
   define('level_prefix_style', level_prefix_style)
   define('level_mapping', level_mapping)
   define('letter_choices', letter_choices)
@@ -125,67 +200,117 @@ code: |
 # =============================================================================
 # SCORING THRESHOLDS AND CONSTANTS
 # =============================================================================
+# Purpose: Define scoring thresholds, maturity levels, and fallback values
+# Input: Business requirements for maturity classification and visualization
+# Output: Threshold dictionaries and default values for scoring system
+# Usage: Provides consistent scoring thresholds and fallback values throughout system
+# Dependencies: None - standalone configuration
 
----
 id: scoring_config
 code: |
   """
-  Scoring system configuration and thresholds.
+  SCORING THRESHOLDS AND CONSTANTS (For Heatmap plot - not implemented yet in 1.0.0)
+  
+  This block defines all scoring thresholds, maturity classifications, and
+  fallback values used throughout the assessment system for consistent
+  performance evaluation and visualization.
+  
+  Maturity Thresholds:
+  - low: < 1.5 (beginner/developing)
+  - medium: 1.5 - 2.5 (intermediate/established)
+  - high: > 2.5 (advanced/mature)
+  
+  Default Values:
+  - Used as fallbacks when data is missing or unavailable
+  - Ensures system continues to function even with incomplete data
+  - Provides consistent baseline for comparisons
+  
+  Heatmap Configuration:
+  - Defines thresholds for visualization color coding
+  - Low threshold: Below 2.0 (red/orange)
+  - High threshold: Above 3.0 (green)
   """
-  # Scoring thresholds
+  
+  # Scoring thresholds for maturity classification
   maturity_thresholds = {
-    'low': 1.5,
-    'medium': 2.5,
-    'high': 3.5
+    'low': 1.5,      # Below 1.5 = low maturity
+    'medium': 2.5,   # 1.5 - 2.5 = medium maturity
+    'high': 3.5      # Above 2.5 = high maturity
   }
   
-  # Default values for fallbacks
+  # Default values for fallbacks when data is missing
   defaults = {
-    'industry_level': 2.0,
-    'overall_score': 0.0,
-    'category_score': 0.0
+    'industry_level': 2.0,    # Default industry benchmark
+    'overall_score': 0.0,     # Default overall score
+    'category_score': 0.0     # Default category score
   }
   
-  # Heatmap configuration
+  # Heatmap configuration for visualization color coding
   heatmap_config = {
-    'low_threshold': 2.0,
-    'high_threshold': 3.0
+    'low_threshold': 2.0,     # Below 2.0 = red/orange
+    'high_threshold': 3.0     # Above 3.0 = green
   }
   
+  # Define global variables for system-wide access
   define('maturity_thresholds', maturity_thresholds)
   define('defaults', defaults)
   define('heatmap_config', heatmap_config)
 
 ---
 # =============================================================================
-# UI CONFIGURATION
+# USER INTERFACE CONFIGURATION
 # =============================================================================
+# Purpose: Configure UI elements, styling, and user interaction components
+# Input: Branding requirements and user experience preferences
+# Output: UI configuration dictionaries for consistent styling
+# Usage: Provides consistent UI styling and branding throughout the assessment
+# Dependencies: None - standalone configuration
 
----
 id: ui_config
 code: |
   """
-  User interface configuration constants.
+  USER INTERFACE CONFIGURATION
+  
+  This block configures all user interface elements including logo sizing,
+  progress bar styling, and button labels for consistent branding and
+  user experience across the assessment system.
+  
+  Logo Configuration:
+  - Height: 100px for prominent branding
+  - Max width: 300px to prevent oversized logos
+  - Used across all screens for brand consistency
+  
+  Progress Bar Configuration:
+  - Height: 10px for optimal visibility
+  - Animation duration: 0.5s for smooth transitions
+  - Used in processing screen and question progress
+  
+  Button Configuration:
+  - Consistent labels across all screens
+  - Clear action descriptions for user guidance
+  - Used in navigation and completion flows
   """
-  # Logo configuration
+  
+  # Logo configuration for consistent branding
   logo_config = {
-    'height': 100,
-    'max_width': 300
+    'height': 100,        # Logo height in pixels
+    'max_width': 300      # Maximum logo width in pixels
   }
   
-  # Progress bar configuration
+  # Progress bar configuration for smooth animations
   progress_config = {
-    'height': '10px',
-    'animation_duration': '0.5s'
+    'height': '10px',           # Progress bar height
+    'animation_duration': '0.5s' # Animation speed for transitions
   }
   
-  # Button configuration
+  # Button configuration for consistent labeling
   button_config = {
-    'continue_label': 'Continue to download',
-    'restart_label': 'Restart',
-    'exit_label': 'Exit'
+    'continue_label': 'Continue to download',  # Main action button
+    'restart_label': 'Restart',                # Restart assessment
+    'exit_label': 'Exit'                       # Exit assessment
   }
   
+  # Define global variables for system-wide access
   define('logo_config', logo_config)
   define('progress_config', progress_config)
   define('button_config', button_config)
@@ -194,52 +319,145 @@ code: |
 # =============================================================================
 # AI PROCESSING CONFIGURATION
 # =============================================================================
+# Purpose: Configure AI content generation limits and processing behavior
+# Input: Content length requirements and AI processing preferences
+# Output: Content limits and AI processing flags for system control
+# Usage: Controls AI content generation and processing behavior
+# Dependencies: None - standalone configuration
 
----
 id: ai_config
 code: |
   """
-  AI processing configuration and limits.
+  AI PROCESSING CONFIGURATION
+  
+  This block configures AI content generation limits and processing behavior
+  to ensure consistent, high-quality output while managing system resources
+  and user experience.
+  
+  Content Generation Limits:
+  - Executive Summary: 2000 characters maximum
+  - Strategic Insights: 1500 characters maximum
+  - Challenge Questions: 1000 characters maximum
+  - Recommended Services: 2000 characters maximum
+  
+  Processing Flags:
+  - Parallel processing: Enable concurrent AI tasks
+  - Fallback content: Provide default content if AI fails
+  - Error recovery: Graceful handling of AI processing errors
+  
+  Quality Control:
+  - Character limits ensure concise, focused content
+  - Processing flags ensure reliable system operation
+  - Fallback mechanisms maintain user experience
   """
-  # Content generation limits
+  
+  # Content generation limits for consistent output length
   content_limits = {
-    'executive_summary_max_chars': 2000,
-    'insights_max_chars': 1500,
-    'questions_max_chars': 1000,
-    'services_max_chars': 2000
+    'executive_summary_max_chars': 2000,  # Executive summary character limit
+    'insights_max_chars': 1500,           # Strategic insights character limit
+    'questions_max_chars': 1000,          # Challenge questions character limit
+    'services_max_chars': 2000            # Recommended services character limit
   }
   
-  # Processing flags
+  # Processing flags for AI behavior control
   ai_flags = {
-    'enable_parallel_processing': True,
-    'enable_fallback_content': True,
-    'enable_error_recovery': True
+    'enable_parallel_processing': True,   # Allow concurrent AI tasks
+    'enable_fallback_content': True,      # Provide default content if AI fails
+    'enable_error_recovery': True         # Graceful error handling
   }
   
+  # Define global variables for system-wide access
   define('content_limits', content_limits)
   define('ai_flags', ai_flags)
 
 ---
 # =============================================================================
-# CONFIGURATION VALIDATION
+# INTELLIGENCE AGENT CONFIGURATION
 # =============================================================================
+# Purpose: Configure Assessment Intelligence Agent features and behavior
+# Input: User preferences for agent functionality
+# Output: Agent configuration flags and settings
+# Usage: Controls whether and how the intelligence agent enhances the assessment
+# Dependencies: None - standalone configuration
+
+id: intelligence_agent_config
+mandatory: True
+code: |
+  # Simple intelligence agent configuration
+  intelligence_agent_config = {
+    'enabled': True,
+    'show_contextual_explanations': True,
+    'show_industry_examples': True,
+    'show_role_insights': True,
+    'show_pattern_analysis': True,
+    'show_consistency_checks': True,
+    'display_style': 'blue_box'
+  }
+  
+  # Define global variables
+  define('intelligence_agent_config', intelligence_agent_config)
+  define('use_intelligence_agent', intelligence_agent_config['enabled'])
+  define('config_test_variable', 'CONFIG_LOADED_SUCCESSFULLY')
+  
+  # Debug log
+  log("✅ Intelligence Agent Config loaded successfully")
 
 ---
+# =============================================================================
+# CONFIGURATION VALIDATION
+# =============================================================================
+# Purpose: Validate that all required configuration constants are properly loaded
+# Input: List of required configuration variables
+# Output: Validation status and error reporting for missing configurations
+# Usage: Ensures system integrity by checking all required configurations are available
+# Dependencies: All other configuration blocks must be loaded first
+
 id: validate_configuration
 code: |
   """
-  Validate that all required configuration is loaded.
+  CONFIGURATION VALIDATION
+  
+  This block validates that all required configuration constants are properly
+  loaded and available for the assessment system to function correctly.
+  
+  Validation Process:
+  - Checks for presence of all critical configuration variables
+  - Reports missing configurations with detailed error messages
+  - Raises exceptions to prevent system operation with incomplete configuration
+  
+  Required Configurations:
+  - industry_averages: Industry benchmark data
+  - processing_total_ms: Processing screen timing
+  - level_mapping: Answer-to-score conversion mapping
+  - maturity_thresholds: Performance classification thresholds
+  - defaults: Fallback values for missing data
+  - logo_config: UI branding configuration
+  - level_prefix_style: Question choice formatting style
+  
+  Error Handling:
+  - Logs missing configurations for debugging
+  - Raises exceptions to prevent system startup with incomplete config
+  - Provides clear error messages for troubleshooting
   """
+  
+  # List of required configuration variables for system operation
   required_configs = [
-    'industry_averages', 'processing_total_ms', 'level_mapping',
-    'maturity_thresholds', 'defaults', 'logo_config', 'level_prefix_style'
+    'industry_averages',      # Industry benchmark data
+    'processing_total_ms',    # Processing screen timing
+    'level_mapping',          # Answer-to-score conversion mapping
+    'maturity_thresholds',    # Performance classification thresholds
+    'defaults',               # Fallback values for missing data
+    'logo_config',            # UI branding configuration
+    'level_prefix_style'      # Question choice formatting style
   ]
   
+  # Check for missing configurations
   missing_configs = []
   for config_name in required_configs:
     if not defined(config_name):
       missing_configs.append(config_name)
   
+  # Handle validation results
   if missing_configs:
     log(f"❌ Missing required configurations: {missing_configs}")
     raise Exception(f"Configuration validation failed: {missing_configs}")

@@ -4,18 +4,68 @@ metadata:
   short title: Assessment Questions
 
 ---
-# Set global level style variable that can be accessed everywhere
+# =============================================================================
+# GLOBAL LEVEL STYLE CONFIGURATION
+# =============================================================================
+# Purpose: Set up global level formatting style for question choices
+# Input: formatting_config from config.yml
+# Output: global_level_style variable accessible throughout the assessment
+# Usage: Ensures consistent choice formatting (A:, 1:, or no prefix) across all questions
+# Dependencies: config.yml formatting_config
+
 initial: True
 id: set_global_level_style
 code: |
+  """
+  GLOBAL LEVEL STYLE SETUP
+  
+  This block loads the formatting configuration and sets up the global level style
+  that determines how question choices are displayed throughout the assessment.
+  
+  Level Styles Supported:
+  - "letter": A: description, B: description, etc.
+  - "number": 1: description, 2: description, etc.  
+  - "none": Just the description text (no prefix)
+  
+  This ensures consistent choice formatting across all 25 assessment questions.
+  """
+  
   # Load formatting configuration to ensure level_prefix_style is available
   need('formatting_config')
   global_level_style = level_prefix_style
 
 ---
+# =============================================================================
+# MAIN QUESTIONS FLOW CONTROLLER
+# =============================================================================
+# Purpose: Orchestrate the complete question flow and manage state transitions
+# Input: questions data, user responses, category feedback
+# Output: questions_complete flag when all questions are answered
+# Usage: Main entry point for the assessment question flow
+# Dependencies: questions_loaded, initialize_answer_placeholders
+
 id: questions_complete
 variable name: questions_complete
 code: |
+  """
+  MAIN QUESTIONS FLOW CONTROLLER
+  
+  This block orchestrates the complete assessment question flow, managing:
+  1. Initialization of answer placeholders and question state
+  2. Sequential question presentation (25 in demo)
+  3. Category feedback collection between question categories
+  4. State transitions and completion tracking
+  
+  Flow Logic:
+  - Initialize answer storage and question index
+  - Present questions one by one with category progress tracking
+  - Collect optional feedback after each category completion
+  - Mark complete when all 25 questions are answered
+  
+  Categories: Positioning/Differentiation, Service Offering, Client Growth, 
+              Delivery/Experience, Retention/Referrals
+  """
+  
   # Initialize everything first
   initialize_answer_placeholders
   
@@ -42,8 +92,34 @@ code: |
     questions_complete = True
 
 ---
+# =============================================================================
+# ANSWER STORAGE INITIALIZATION
+# =============================================================================
+# Purpose: Initialize data structures for storing user responses and tracking progress
+# Input: questions data from data_loader.yml
+# Output: answers list, current_question index, category_feedback dict
+# Usage: Sets up storage for 25 question responses and category feedback
+# Dependencies: questions_loaded from data_loader.yml
+
 id: initialize_answer_placeholders
 code: |
+  """
+  ANSWER STORAGE INITIALIZATION
+  
+  This block initializes all data structures needed to store user responses
+  and track progress through the assessment questions.
+  
+  Data Structures Created:
+  - answers: List of 25 None values (one for each question)
+  - current_question: Index tracking current question position (0-24)
+  - category_feedback: Dictionary to store optional feedback per category
+  
+  Design Notes:
+  - Uses plain Python list instead of DAList to avoid pickle serialization issues
+  - Pre-allocates space for all 25 answers to ensure consistent indexing
+  - Initializes category feedback storage for optional user input
+  """
+  
   # Load questions first
   need('questions_loaded')
   
@@ -63,16 +139,43 @@ code: |
   initialize_answer_placeholders = True
 
 ---
+# =============================================================================
+# QUESTION CHOICES FORMATTING
+# =============================================================================
+# Purpose: Format question choices based on global level style configuration
+# Input: current question data, global_level_style setting
+# Output: current_question_choices list formatted for radio buttons
+# Usage: Dynamically formats choice options (A:, 1:, or no prefix) for each question
+# Dependencies: global_level_style, questions data, current_question index
+
 id: current_question_choices
 depends on:
   - current_question
   - global_level_style
 code: |
+  """
+  QUESTION CHOICES FORMATTING
+  
+  This block dynamically formats the choice options for the current question
+  based on the global level style configuration. It converts raw level descriptions
+  into properly formatted choice text for radio button display.
+  
+  Formatting Styles:
+  - "letter": A: description, B: description, C: description, etc.
+  - "number": 1: description, 2: description, 3: description, etc.
+  - "none": Just the description text without any prefix
+  
+  Error Handling:
+  - Graceful fallback to "Level X: description" if formatting fails
+  - Returns "Loading..." if question data is not available
+  """
+  
   # Force evaluation of the global level style first
   need('global_level_style')
   current_style = global_level_style
   
   def format_level_display_local(level_index, description_text, style):
+    """Format individual choice text based on style preference"""
     if style == "number":
       prefix = str(level_index + 1)
     elif style == "letter":
@@ -88,64 +191,94 @@ code: |
     else:
       return prefix
   
+  # Format choices for the current question
   if defined('questions') and defined('current_question') and current_question < len(questions) and 'levels' in questions[current_question]:
     raw_levels = questions[current_question]['levels']
     formatted_choices = []
+    
+    # Process each level description
     for i, description_text in enumerate(raw_levels):
       try:
         formatted_choice = format_level_display_local(i, description_text, current_style)
       except Exception as e:
+        # Fallback formatting if style processing fails
         formatted_choice = f"Level {i}: {description_text}"
       formatted_choices.append(formatted_choice)
+    
     current_question_choices = formatted_choices
   else:
+    # Fallback if question data is not available
     current_question_choices = ['Loading...']
 
 ---
+# =============================================================================
+# INDIVIDUAL QUESTION DISPLAY
+# =============================================================================
+# Purpose: Present individual assessment questions with progress tracking and UI
+# Input: current question data, progress information, formatted choices
+# Output: Question display with progress bar and category information
+# Usage: Main question interface showing one question at a time with progress
+# Dependencies: current_question_choices, questions data, logo_file
+
 question: |
-  <h3 class="mb-2">${ questions[current_question]['prompt'] if defined('questions') and defined('current_question') and current_question < len(questions) else 'Loading question...' }</h3>
+  <!-- Question moved to subquestion section -->
+
 logo: |
   <img src="${ logo_file.url_for() }" alt="Logo" class="brand-logo" style="height:50px; width:auto; vertical-align:middle;">
+
 subquestion: |
   % if defined('questions') and defined('current_question') and current_question < len(questions):
-  <div class="card mb-3">
-    <div class="card-header bg-primary text-white">
-      <h4>📋 ${questions[current_question]['category']}</h4>
+  <!-- Category and Progress Bar (Top - Shortened) -->
+  <div class="card mb-2" style="max-width: 800px; margin: 0 auto;">
+    <div class="card-header bg-primary text-white" style="padding: 0.5rem;">
+      <h6 style="font-size: 0.9rem; margin: 0;">📋 Category: ${questions[current_question]['category']}</h6>
     </div>
-    <div class="card-body">
-      <div class="mb-3">
-        <div class="progress">
-          <div class="progress-bar" role="progressbar" 
-               style="width: ${(current_question + 1) * 100 / len(questions)}%; background: linear-gradient(90deg, #007bff, #28a745);" 
-               aria-valuenow="${current_question + 1}" 
-               aria-valuemin="0" 
-               aria-valuemax="${len(questions)}">
-          </div>
+    <div class="card-body" style="padding: 0.5rem;">
+      <!-- Overall Progress Bar -->
+      <div class="progress" style="margin-bottom: 0;">
+        <div class="progress-bar" role="progressbar" 
+             style="width: ${(current_question + 1) * 100 / len(questions)}%; background: linear-gradient(90deg, #007bff, #28a745);" 
+             aria-valuenow="${current_question + 1}" 
+             aria-valuemin="0" 
+             aria-valuemax="${len(questions)}">
         </div>
-        <div class="text-center mt-2">
-          <small class="text-muted">
-            Question ${current_question + 1} of ${len(questions)} overall
-            % if defined('questions') and current_question < len(questions):
-            <br>
-            <%
-            # Calculate category-specific progress
-            current_category = questions[current_question]['category']
-            category_questions = [q for q in questions if q['category'] == current_category]
-            category_position = 1
-            for i, q in enumerate(questions):
-              if q['category'] == current_category:
-                if i == current_question:
-                  break
-                category_position += 1
-            %>
-            (Question ${category_position} of ${len(category_questions)} for ${current_category})
-            % endif
-          </small>
-        </div>
+      </div>
+      <div class="text-center" style="margin-top: 0.25rem;">
+        <small class="text-muted" style="font-size: 0.75rem;">
+          <!-- Overall Progress: Question X of 25 -->
+          Question ${current_question + 1} of ${len(questions)} overall
+          % if defined('questions') and current_question < len(questions):
+          <br>
+          <%
+          # Calculate category-specific progress for current question
+          current_category = questions[current_question]['category']
+          category_questions = [q for q in questions if q['category'] == current_category]
+          category_position = 1
+          for i, q in enumerate(questions):
+            if q['category'] == current_category:
+              if i == current_question:
+                break
+              category_position += 1
+          %>
+          <!-- Category Progress: Question X of Y for Category -->
+          (Question ${category_position} of ${len(category_questions)} for ${current_category})
+          % endif
+        </small>
       </div>
     </div>
   </div>
+  
+  <!-- Question (Below Category/Progress) -->
+  <div class="question-full-width mb-2" style="padding: 1rem 2rem;">
+    <h3 class="text-left mb-2" style="margin-top: 0.5rem;">${ questions[current_question]['prompt'] if defined('questions') and defined('current_question') and current_question < len(questions) else 'Loading question...' }</h3>
+  </div>
+  
+  <!-- Question Options (Full Width) -->
+  <div class="question-options-full-width">
+    <!-- Question options will appear here -->
+  </div>
   % else:
+  <!-- Loading State -->
   <div class="card mb-3">
     <div class="card-header bg-secondary text-white">
       <h4>Loading...</h4>
@@ -153,11 +286,50 @@ subquestion: |
   </div>
   % endif
 fields:
+  # Radio button choices for the current question
   - no label: answers[current_question]
     datatype: radio
     code: current_question_choices
+
+help: |
+  <% need('generate_intelligence_agent_content') %>
+  ${ generate_intelligence_agent_content }
+  <script>
+    // Hide any native/help-generated "Back to question" buttons at the top
+    (function hideNativeHelpButtons(){
+      try {
+        var helpRoot = document.querySelector('#daquestionhelp') || document.querySelector('.help-panel') || document.querySelector('[data-help="true"]') || document;
+        if (!helpRoot) return;
+        var buttons = helpRoot.querySelectorAll('button, a.btn');
+        buttons.forEach(function(btn){
+          var text = (btn.innerText || btn.textContent || '').trim().toLowerCase();
+          var isCustom = btn.classList && btn.classList.contains('custom-back-button');
+          if (!isCustom && (text === 'back to question' || text.includes('back to question'))){
+            btn.style.display = 'none';
+          }
+        });
+      } catch(e) {}
+    })();
+  </script>
+  
+  <div style="margin-top: 30px; text-align: center;">
+    <button type="button" class="btn btn-primary custom-back-button" onclick="history.back()">← Back to Question</button>
+  </div>
+
 field: current_question_response
+
 validation code: |
+  """
+  QUESTION RESPONSE VALIDATION AND PROGRESSION
+  
+  This validation code handles:
+  1. Storing the user's answer in the answers list
+  2. Detecting when a category is completed
+  3. Triggering category feedback collection
+  4. Advancing to the next question
+  5. Managing state transitions
+  """
+  
   # Log the answer being stored
   log(f"✅ Question {current_question + 1}: Answer stored as '{answers[current_question]}'")
   
@@ -168,6 +340,7 @@ validation code: |
   elif questions[current_question]['category'] != questions[current_question + 1]['category']:
     is_last_in_category = True
   
+  # Trigger category feedback if category is completed
   if is_last_in_category:
     # Set the category that needs feedback
     need_category_feedback = questions[current_question]['category']
@@ -185,25 +358,60 @@ validation code: |
     del current_question_response
 
 ---
+# =============================================================================
+# CATEGORY FEEDBACK COLLECTION
+# =============================================================================
+# Purpose: Collect optional feedback after each question category completion
+# Input: need_category_feedback variable set by validation code
+# Output: category_feedback dictionary with user input
+# Usage: Optional feedback collection to improve future assessments
+# Dependencies: Triggered by validation code when category is completed
+
 id: ask_category_feedback
 question: |
   Category Complete: ${need_category_feedback}
+
 subquestion: |
   You've completed all questions in the **${need_category_feedback}** category.
   
   Is there anything we should have asked about in this category but didn't?
   
   This is optional but helps us improve future assessments.
+
 fields:
+  # Optional feedback text area for category improvement suggestions
   - no label: category_feedback[need_category_feedback]
     datatype: area
     required: False
     rows: 3
+
 continue button field: feedback_provided
 
 ---
+# =============================================================================
+# SCORING TRIGGER
+# =============================================================================
+# Purpose: Trigger scoring calculations after all questions are completed
+# Input: answers list with all 25 user responses
+# Output: Calls scoring.yml to calculate category and overall scores
+# Usage: Final step after questions completion to prepare results
+# Dependencies: scoring.yml calculate_scores_and_averages function
+
 id: calculate_category_averages_dynamic
 code: |
+  """
+  SCORING TRIGGER
+  
+  This block triggers the scoring calculations after all 25 questions have been
+  completed. It calls the centralized scoring function from scoring.yml to:
+  1. Calculate individual question scores
+  2. Compute category averages
+  3. Determine overall assessment score
+  4. Calculate industry benchmark comparisons
+  
+  This ensures all scoring is done consistently using the centralized logic.
+  """
+  
   # Trigger scoring calculation from scoring.yml
   calculate_scores_and_averages
   
