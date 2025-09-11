@@ -1,507 +1,222 @@
 ---
 # =============================================================================
-# ASSESSMENT INTELLIGENCE AGENT - PHASE 1
+# AGENTIC AI ASSESSMENT INTELLIGENCE AGENT
 # =============================================================================
-# Purpose: Provide intelligent, contextual insights during assessment without altering core structure
-# Input: Current question, user context, response patterns, industry/role data
-# Output: Contextual explanations, industry examples, personalized insights, pattern analysis
-# Usage: Enhances user experience with intelligent guidance while preserving assessment integrity
-# Dependencies: config.yml (intelligence_agent_config), questions data, user information
+# Purpose: Generate dynamic, AI-driven insights using OpenAI API integration
+# Input: Current question data, user responses, user context, configuration
+# Output: Personalized AI content generated dynamically based on context
+# Usage: Provides intelligent, adaptive guidance during assessment
+# Dependencies: intelligence_agent_config, questions data, user context, OpenAI API
 
 metadata:
-  title: Assessment Intelligence Agent - Phase 1
-  description: Modular intelligence agent that enhances assessment experience with contextual insights
+  title: Agentic AI Assessment Intelligence Agent
+  description: Dynamic AI-driven insights using OpenAI API for personalized assessment guidance
 
 ---
 # =============================================================================
-# INTELLIGENCE AGENT CONTENT GENERATOR
+# AGENTIC AI CONTENT GENERATOR
 # =============================================================================
-# Purpose: Generate intelligent, contextual content for display in blue box during assessment
-# Input: Current question data, user context, response patterns, configuration settings
-# Output: HTML content for blue box display with contextual insights and guidance
-# Usage: Referenced by questions.yml as ${ generate_intelligence_agent_content }
-# Dependencies: intelligence_agent_config, questions data, user_information
+# Purpose: Generate dynamic, AI-driven insights using OpenAI API integration
+# Input: Current question data, user responses, user context, configuration
+# Output: Personalized AI content generated dynamically based on context
+# Usage: Provides intelligent, adaptive guidance during assessment
+# Dependencies: intelligence_agent_config, questions data, user context, OpenAI API
 
 id: generate_intelligence_agent_content
-sets: generate_intelligence_agent_content
-reconsider: True
 depends on:
-  - current_question
-  - answers
-  - user_information
+  - use_intelligence_agent
+  - current_category
+  - questions
 code: |
-  # Force load the config first
-  need('intelligence_agent_config')
-  need('use_intelligence_agent')
   """
-  ASSESSMENT INTELLIGENCE AGENT CONTENT GENERATOR
-  
-  This function generates intelligent, contextual content for display during the assessment.
-  It provides real-time insights, explanations, and guidance without altering the core
-  assessment structure or scoring methodology.
-  
-  Features:
-  - Contextual question explanations
-  - Industry-specific examples and insights
-  - Role-based guidance and perspectives
-  - Real-time response pattern analysis
-  - Consistency checks and clarifications
-  
-  The content is displayed in a blue box above each question to enhance user experience
-  and provide valuable context without interfering with the assessment flow.
-  """
-  
-  # Determine agent enabled state (default True if flag missing)
-  agent_enabled = True
-  if defined('use_intelligence_agent'):
-    agent_enabled = use_intelligence_agent
+  AGENTIC AI ASSESSMENT INTELLIGENCE AGENT
 
-  # Only generate content when agent is enabled and we have question context
-  if not agent_enabled or not defined('current_question') or current_question >= len(questions):
-    generate_intelligence_agent_content = ''
+  This block generates dynamic, AI-driven insights using OpenAI API integration.
+  It analyzes user responses, provides contextual guidance, and generates
+  personalized recommendations based on real-time analysis.
+
+  Agent Capabilities:
+  1. Dynamic Content Generation - AI generates contextual explanations
+  2. Pattern Analysis - AI analyzes response patterns and trends
+  3. Industry-Specific Guidance - AI provides tailored industry insights
+  4. Role-Based Recommendations - AI adapts guidance to user's role
+  5. Consistency Analysis - AI identifies potential contradictions
+  6. Personalized Insights - AI generates unique insights for each user
+
+  The agent uses OpenAI API to generate dynamic content based on:
+  - Current question context and category
+  - User's industry, role, and company context
+  - Previous response patterns and trends
+  - Assessment progress and completion status
+  """
+
+  # Derive current category locally (no mutation)
+  derived_category = ''
+  if defined('questions') and defined('current_question') and current_question < len(questions):
+    try:
+      derived_category = questions[current_question].get('category', '')
+    except Exception:
+      derived_category = ''
+  
+  # Check if intelligence agent is enabled
+  if not defined('use_intelligence_agent') or not use_intelligence_agent:
+    generate_intelligence_agent_content = 'Intelligence agent is disabled.'
+  elif not defined('questions') or not defined('current_question') or current_question >= len(questions):
+    generate_intelligence_agent_content = 'Loading question data...'
   else:
-    # Get current question data and user context
-    current_question_data = questions[current_question] if current_question < len(questions) else {}
+    current_question_data = questions[current_question]
+    
+    # Build comprehensive context for AI analysis
     user_context = {
-      'industry': user_information.get('industry', '') if defined('user_information') and user_information else '',
-      'role': user_information.get('role', '') if defined('user_information') and user_information else '',
-      'company': user_information.get('company', '') if defined('user_information') and user_information else ''
+      'industry': user_industry if defined('user_industry') else 'Not specified',
+      'role': user_role if defined('user_role') else 'Not specified',
+      'company_size': user_company_size if defined('user_company_size') else 'Not specified',
+      'current_question': current_question,
+      'total_questions': len(questions),
+      'current_category': derived_category,
+      'question_prompt': current_question_data.get('prompt', ''),
+      'progress_percentage': round((current_question / len(questions)) * 100, 1)
     }
     
-    # Build intelligent content sections
-    content_sections = []
+    # Build response history for pattern analysis
+    response_history = []
+    if defined('answers') and answers:
+      for i in range(min(current_question, len(answers))):
+        if answers[i]:
+          response_history.append({
+            'question_number': i + 1,
+            'category': questions[i]['category'],
+            'response': answers[i],
+            'response_level': 'High' if 'D:' in str(answers[i]) or 'E:' in str(answers[i]) else 'Medium' if 'C:' in str(answers[i]) else 'Low'
+          })
     
-    # 1. Contextual Question Explanation
-    if defined('intelligence_agent_config') and intelligence_agent_config.get('show_contextual_explanations', True):
-      # Generate explanation directly here
-      question_category = current_question_data.get('category', '')
-      category_explanations = {
-        'Positioning and Differentiation': {
-          'importance': 'This area determines how clearly your firm is positioned in the market and how well you differentiate from competitors.',
-          'impact': 'Strong positioning drives higher win rates, premium pricing, and inbound demand.',
-          'context': 'These questions help us understand your market clarity and competitive advantage.'
-        },
-        'Service Offering and Value Design': {
-          'importance': 'This area evaluates how well-defined and scalable your service offerings are.',
-          'impact': 'Clear service offerings enable consistent delivery, team scaling, and predictable revenue.',
-          'context': 'These questions assess your service portfolio maturity and delivery consistency.'
-        },
-        'Client Growth & Demand Generation': {
-          'importance': 'This area measures your ability to grow existing client relationships and expand business.',
-          'impact': 'Strong client growth capabilities drive revenue expansion and long-term partnerships.',
-          'context': 'These questions evaluate your account management and expansion strategies.'
-        },
-        'Delivery & Client Experience': {
-          'importance': 'This area assesses how consistently you deliver value and manage client experiences.',
-          'impact': 'Excellent delivery drives client satisfaction, referrals, and repeat business.',
-          'context': 'These questions examine your project management and client experience capabilities.'
-        },
-        'Retention, Referrals & Relationship Growth': {
-          'importance': 'This area evaluates your ability to retain clients and generate referrals.',
-          'impact': 'Strong retention and referral systems create sustainable, predictable revenue growth.',
-          'context': 'These questions assess your client relationship management and advocacy programs.'
+    # Generate AI prompt for dynamic content generation
+    ai_prompt = f"""
+    You are an expert business consultant.
+    Return a SHORT, high-signal help note (max ~80-120 words), formatted in HTML using <strong> section labels and <br> line breaks.
+    Do not repeat the question. Avoid fluff. Focus on CONTEXT and INSIGHT, NOT actionable steps.
+
+    Context:
+    - Industry: {user_context['industry']}
+    - Role: {user_context['role']}
+    - Progress: {user_context['progress_percentage']}% (Q{user_context['current_question'] + 1}/{user_context['total_questions']})
+    - Category: {user_context['current_category']}
+    - Question: {user_context['question_prompt']}
+    - Responses so far: {response_history}
+
+    Guidance for early questions (first 1-2 in a category):
+    - Provide orientation: define what "good" looks like in this category for firms like this.
+    - Reference typical pitfalls and signals of maturity WITHOUT prescribing steps.
+    - Avoid empty progress phrasing; if little data, say "early signals are limited" and ground in category intent.
+
+    Sections to include (only if relevant):
+    - Why this matters (1 line)
+    - Industry context (1 line)
+    - Role perspective (1 line)
+    - Assessment insight (1 line) — interpret current category intent and what to pay attention to next
+    """
+    
+    # Generate AI content using OpenAI API
+    try:
+      import openai
+      from docassemble.base.util import get_config
+      
+      # Get OpenAI configuration - using the same pattern as other working files
+      api_key = get_config('openai', {}).get('api_key', '')
+      
+      if not api_key:
+        raise Exception("❌ AI ERROR: No OpenAI API key configured. Please set up OpenAI API key in Docassemble configuration.")
+      
+      # Log that we're making API call
+      log("🤖 Making OpenAI API call to GPT-4.1-mini for intelligence agent")
+      
+      # Call OpenAI via HTTPS directly to avoid non-pickleable client objects
+      try:
+        import requests, json
+        headers = {
+          'Authorization': f'Bearer {api_key}',
+          'Content-Type': 'application/json'
         }
-      }
-      
-      if question_category in category_explanations:
-        explanation = category_explanations[question_category]
-        content_sections.append('<strong>Why This Matters:</strong> ' + explanation['importance'] + '<br><br><strong>Business Impact:</strong> ' + explanation['impact'] + '<br><br><strong>Assessment Context:</strong> ' + explanation['context'])
-    
-    # 2. Industry-Specific Insights
-    if defined('intelligence_agent_config') and intelligence_agent_config.get('show_industry_examples', True) and user_context.get('industry'):
-      industry = user_context.get('industry', '')
-      question_category = current_question_data.get('category', '')
-      
-      industry_insights = {
-        'Technology': {
-          'Positioning and Differentiation': 'In tech consulting, differentiation often comes from specific technologies (AI/ML, cloud platforms) or methodologies (Agile, DevOps). Consider how your technical expertise sets you apart.',
-          'Service Offering and Value Design': 'Tech firms often struggle with service standardization. Think about how you package technical expertise into repeatable offerings.',
-          'Client Growth & Demand Generation': 'Technology clients often have rapid growth cycles. Consider how you scale with their evolving needs.',
-          'Delivery & Client Experience': 'Tech projects often involve complex integrations. Think about your project management and technical delivery processes.',
-          'Retention, Referrals & Relationship Growth': 'Tech clients value innovation and technical excellence. Consider how you maintain relationships through technology evolution.'
-        },
-        'Financial Services': {
-          'Positioning and Differentiation': 'Financial services consulting requires deep regulatory and risk expertise. Consider how your compliance knowledge differentiates you.',
-          'Service Offering and Value Design': 'Financial services often involve complex regulatory requirements. Think about how you package compliance expertise.',
-          'Client Growth & Demand Generation': 'Financial institutions value stability and expertise. Consider how you demonstrate long-term value and expertise.',
-          'Delivery & Client Experience': 'Financial projects often involve risk management. Think about your quality control and risk mitigation processes.',
-          'Retention, Referrals & Relationship Growth': 'Financial services value trust and expertise. Consider how you maintain relationships through regulatory changes.'
-        },
-        'Healthcare': {
-          'Positioning and Differentiation': 'Healthcare consulting requires deep regulatory knowledge. Consider how your compliance expertise differentiates you.',
-          'Service Offering and Value Design': 'Healthcare services often involve regulatory compliance. Think about how you standardize complex regulatory processes.',
-          'Client Growth & Demand Generation': 'Healthcare organizations have long decision cycles. Consider your relationship-building and trust-establishment processes.',
-          'Delivery & Client Experience': 'Healthcare projects often involve patient safety. Think about your quality assurance and risk management processes.',
-          'Retention, Referrals & Relationship Growth': 'Healthcare is relationship-driven. Consider how you build long-term partnerships in this trust-based industry.'
-        },
-        'Professional Services': {
-          'Positioning and Differentiation': 'Professional services consulting often competes on expertise and relationships. Consider how your specialized knowledge differentiates you.',
-          'Service Offering and Value Design': 'Professional services often involve complex problem-solving. Think about how you standardize consulting methodologies.',
-          'Client Growth & Demand Generation': 'Professional services clients value expertise and results. Consider how you demonstrate value and build long-term relationships.',
-          'Delivery & Client Experience': 'Professional services projects often involve strategic thinking. Think about your methodology and client engagement processes.',
-          'Retention, Referrals & Relationship Growth': 'Professional services are relationship-driven. Consider how you build advocacy and referral programs.'
+        payload = {
+          'model': 'gpt-4.1-mini',
+          'messages': [
+            {'role': 'system', 'content': "You are an expert business consultant providing intelligent, contextual guidance during strategic assessments. Generate dynamic, personalized insights based on the user's specific context and response patterns."},
+            {'role': 'user', 'content': ai_prompt}
+          ],
+          'max_tokens': 800,
+          'temperature': 0.7
         }
-      }
-      
-      if industry in industry_insights and question_category in industry_insights[industry]:
-        insight = industry_insights[industry][question_category]
-        content_sections.append('<strong>Industry Context (' + industry + '):</strong> ' + insight)
-    
-    # 3. Role-Based Guidance
-    if defined('intelligence_agent_config') and intelligence_agent_config.get('show_role_insights', True) and user_context.get('role'):
-      role = user_context.get('role', '')
-      question_category = current_question_data.get('category', '')
-      
-      role_guidance = {
-        'Executive/CEO': {
-          'general': 'As an executive, consider the strategic implications of your responses. Think about how these capabilities impact overall business performance and competitive position.',
-          'Positioning and Differentiation': 'Consider how your market positioning drives business growth and competitive advantage.',
-          'Service Offering and Value Design': 'Think about how your service portfolio supports strategic objectives and revenue goals.',
-          'Client Growth & Demand Generation': 'Consider how client growth capabilities impact business scalability and market expansion.',
-          'Delivery & Client Experience': 'Think about how delivery excellence supports client satisfaction and business reputation.',
-          'Retention, Referrals & Relationship Growth': 'Consider how retention and referral capabilities drive sustainable revenue growth.'
-        },
-        'Senior Manager': {
-          'general': 'As a senior manager, consider both strategic and operational aspects. Think about how these capabilities impact team performance and organizational effectiveness.',
-          'Positioning and Differentiation': 'Consider how clear positioning helps your team understand their role in market success.',
-          'Service Offering and Value Design': 'Think about how well-defined services enable consistent team performance and client delivery.',
-          'Client Growth & Demand Generation': 'Consider how client growth processes support team objectives and business development.',
-          'Delivery & Client Experience': 'Think about how delivery processes impact team efficiency and client satisfaction.',
-          'Retention, Referrals & Relationship Growth': 'Consider how retention processes support team success and business growth.'
-        },
-        'Department Head': {
-          'general': 'As a department head, consider how these capabilities impact your department\'s effectiveness and contribution to organizational goals.',
-          'Positioning and Differentiation': 'Consider how clear positioning helps your department align with market opportunities.',
-          'Service Offering and Value Design': 'Think about how service clarity enables effective department operations and client delivery.',
-          'Client Growth & Demand Generation': 'Consider how client growth processes support department objectives and business development.',
-          'Delivery & Client Experience': 'Think about how delivery processes impact department performance and client satisfaction.',
-          'Retention, Referrals & Relationship Growth': 'Consider how retention processes support department success and business growth.'
-        },
-        'Team Lead': {
-          'general': 'As a team lead, consider how these capabilities impact your team\'s day-to-day effectiveness and client delivery.',
-          'Positioning and Differentiation': 'Consider how clear positioning helps your team understand their value proposition.',
-          'Service Offering and Value Design': 'Think about how service clarity enables consistent team performance and client delivery.',
-          'Client Growth & Demand Generation': 'Consider how client growth processes support team objectives and business development.',
-          'Delivery & Client Experience': 'Think about how delivery processes impact team efficiency and client satisfaction.',
-          'Retention, Referrals & Relationship Growth': 'Consider how retention processes support team success and business growth.'
-        },
-        'Consultant': {
-          'general': 'As a consultant, consider how these capabilities impact your ability to deliver value to clients and contribute to business success.',
-          'Positioning and Differentiation': 'Consider how clear positioning helps you understand your role in client success.',
-          'Service Offering and Value Design': 'Think about how service clarity enables effective client delivery and project success.',
-          'Client Growth & Demand Generation': 'Consider how client growth processes support your professional development and business contribution.',
-          'Delivery & Client Experience': 'Think about how delivery processes impact your effectiveness and client satisfaction.',
-          'Retention, Referrals & Relationship Growth': 'Consider how retention processes support your professional success and business growth.'
-        }
-      }
-      
-      if role in role_guidance:
-        if question_category in role_guidance[role]:
-          guidance = role_guidance[role][question_category]
-        else:
-          guidance = role_guidance[role]['general']
+        resp = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=payload, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        ai_content = data['choices'][0]['message']['content']
+        # Clean up to avoid storing non-pickleable objects
+        del resp
+        del data
         
-        content_sections.append('<strong>Role Perspective (' + role + '):</strong> ' + guidance)
-    
-    # 4. Response Pattern Analysis (only after 2+ questions)
-    if defined('intelligence_agent_config') and intelligence_agent_config.get('show_pattern_analysis', True) and current_question >= 2:
-      # Generate pattern analysis in markdown format
-      if defined('answers') and answers and current_question >= 2:
-        pattern_insights = []
+        # Log successful API response
+        log("✅ OpenAI API call successful - generating real AI content")
         
-        # Check for high-performing responses (D or E answers)
-        high_performing_count = 0
-        for i in range(min(current_question, len(answers))):
-          if answers[i] and ('D:' in str(answers[i]) or 'E:' in str(answers[i])):
-            high_performing_count += 1
+        # Format the AI response for display
+        generate_intelligence_agent_content = f'<div style="padding-top: 6px;">{ai_content}</div>'
         
-        if high_performing_count > 0:
-          high_percentage = (high_performing_count / current_question) * 100
+      except Exception as api_error:
+        log(f"❌ OpenAI API call failed: {str(api_error)}")
+        raise api_error
+      
+    except Exception as e:
+      # Log the error for debugging
+      log(f"❌ OpenAI API Error: {str(e)}")
+      # Fallback to dynamic content generation if API fails
+      # Fallback to dynamic content generation if API fails
+      content_sections = []
+      
+      # Dynamic pattern analysis
+      if response_history:
+        high_responses = [r for r in response_history if r['response_level'] == 'High']
+        low_responses = [r for r in response_history if r['response_level'] == 'Low']
+        
+        if high_responses:
+          high_percentage = (len(high_responses) / len(response_history)) * 100
           if high_percentage >= 60:
-            pattern_insights.append(f"<strong>Strength Pattern:</strong> You're showing strong performance in {high_percentage:.0f}% of questions so far, indicating solid organizational capabilities.")
+            content_sections.append(f"<strong>Performance Analysis:</strong> You're demonstrating strong capabilities in {high_percentage:.0f}% of areas assessed so far, indicating solid organizational foundations.")
           elif high_percentage >= 40:
-            pattern_insights.append(f"<strong>Mixed Performance:</strong> You're showing strong performance in {high_percentage:.0f}% of questions, with room for improvement in other areas.")
+            content_sections.append(f"<strong>Performance Analysis:</strong> You're showing mixed performance with {high_percentage:.0f}% strong responses, suggesting areas for focused improvement.")
         
-        # Check for low-performing responses (A or B answers)
-        low_performing_count = 0
-        for i in range(min(current_question, len(answers))):
-          if answers[i] and ('A:' in str(answers[i]) or 'B:' in str(answers[i])):
-            low_performing_count += 1
-        
-        if low_performing_count > 0:
-          low_percentage = (low_performing_count / current_question) * 100
+        if low_responses:
+          low_percentage = (len(low_responses) / len(response_history)) * 100
           if low_percentage >= 40:
-            pattern_insights.append(f"<strong>Growth Opportunity:</strong> {low_percentage:.0f}% of your responses indicate areas for significant improvement, which represents substantial growth potential.")
-        
-        # Check for consistency within current category
-        current_category = current_question_data.get('category', '')
-        if current_category:
-          category_responses = []
-          for i in range(min(current_question, len(answers))):
-            if i < len(questions) and questions[i].get('category') == current_category:
-              if answers[i]:
-                category_responses.append(answers[i])
-          
-          if len(category_responses) > 1:
-            # Check for consistency in category responses
-            high_in_category = sum(1 for resp in category_responses if 'D:' in str(resp) or 'E:' in str(resp))
-            if high_in_category == len(category_responses):
-              pattern_insights.append(f"<strong>Category Strength:</strong> You're showing consistent strength in {current_category}, indicating this is a well-developed organizational capability.")
-            elif high_in_category == 0:
-              pattern_insights.append(f"<strong>Category Focus:</strong> {current_category} appears to be an area for focused improvement, representing significant growth opportunity.")
-        
-        if pattern_insights:
-          pattern_analysis = "<strong>Response Pattern Analysis:</strong> " + " ".join(pattern_insights)
-          content_sections.append(pattern_analysis)
-    
-    # 5. Consistency Checks (only after 2+ questions)
-    if defined('intelligence_agent_config') and intelligence_agent_config.get('show_consistency_checks', True) and current_question >= 2:
-      # Generate consistency check in markdown format
-      if defined('answers') and answers and current_question >= 2:
-        consistency_checks = []
-        
-        # Check for contradictory responses within same category
-        current_category = current_question_data.get('category', '')
-        if current_category:
-          category_responses = []
-          for i in range(min(current_question, len(answers))):
-            if i < len(questions) and questions[i].get('category') == current_category:
-              if answers[i]:
-                category_responses.append((i, answers[i]))
-          
-          if len(category_responses) > 1:
-            # Check for high-low contradictions within category
-            high_responses = [resp for i, resp in category_responses if 'D:' in str(resp) or 'E:' in str(resp)]
-            low_responses = [resp for i, resp in category_responses if 'A:' in str(resp) or 'B:' in str(resp)]
-            
-            if high_responses and low_responses:
-              consistency_checks.append(f"<strong>Category Consistency Check:</strong> You've given both high and low responses in {current_category}. Consider whether this reflects different aspects of the same capability or if clarification is needed.")
-        
-        # Check for potential contradictions across related categories
-        if current_question >= 3:
-          # Look for positioning vs. service offering contradictions
-          positioning_responses = []
-          service_responses = []
-          
-          for i in range(min(current_question, len(answers))):
-            if i < len(questions) and answers[i]:
-              category = questions[i].get('category', '')
-              if 'Positioning' in category:
-                positioning_responses.append(answers[i])
-              elif 'Service' in category:
-                service_responses.append(answers[i])
-          
-          if positioning_responses and service_responses:
-            pos_high = any('D:' in str(resp) or 'E:' in str(resp) for resp in positioning_responses)
-            pos_low = any('A:' in str(resp) or 'B:' in str(resp) for resp in positioning_responses)
-            svc_high = any('D:' in str(resp) or 'E:' in str(resp) for resp in service_responses)
-            svc_low = any('A:' in str(resp) or 'B:' in str(resp) for resp in service_responses)
-            
-            if (pos_high and svc_low) or (pos_low and svc_high):
-              consistency_checks.append("<strong>Cross-Category Check:</strong> Your positioning and service offering responses show different maturity levels. Consider whether this reflects your actual situation or if there's a disconnect to clarify.")
-        
-        if consistency_checks:
-          consistency_check = "<strong>Consistency Check:</strong> " + " ".join(consistency_checks)
-          content_sections.append(consistency_check)
-    
-    # No debug info needed - agent is working!
-    
-    # Combine all sections into final content for Help system
-    if content_sections:
-      combined_content = '<br><br>'.join(content_sections)
-      generate_intelligence_agent_content = '<div style="padding-top: 10px;">' + combined_content + '</div>'
-    else:
-      # Fallback content for Help system
-      generate_intelligence_agent_content = '<strong>Welcome to your assessment!</strong> As you progress through the questions, I\'ll provide contextual insights, industry examples, and personalized guidance to help you get the most value from this diagnostic.'
-
----
-# =============================================================================
-# QUESTION EXPLANATION GENERATOR
-# =============================================================================
-# Purpose: Generate contextual explanations for why each question matters
-# Input: Current question data, user context
-# Output: HTML explanation content
-# Usage: Provides context and importance of each assessment question
-
-id: generate_question_explanation
-sets: generate_question_explanation
-depends on:
-  - current_question_data
-reconsider: True
-code: |
-  # QUESTION EXPLANATION GENERATOR
-  # Generates contextual explanations that help users understand why questions matter
-  
-  question_category = current_question_data.get('category', '') if defined('current_question_data') else ''
-  
-  # Category-specific explanations
-  category_explanations = {
-    'Positioning and Differentiation': {
-      'importance': 'This area determines how clearly your firm is positioned in the market and how well you differentiate from competitors.',
-      'impact': 'Strong positioning drives higher win rates, premium pricing, and inbound demand.',
-      'context': 'These questions help us understand your market clarity and competitive advantage.'
-    },
-    'Service Offering and Value Design': {
-      'importance': 'This area evaluates how well-defined and scalable your service offerings are.',
-      'impact': 'Clear service offerings enable consistent delivery, team scaling, and predictable revenue.',
-      'context': 'These questions assess your service portfolio maturity and delivery consistency.'
-    },
-    'Client Growth & Demand Generation': {
-      'importance': 'This area measures your ability to grow existing client relationships and expand business.',
-      'impact': 'Strong client growth capabilities drive revenue expansion and long-term partnerships.',
-      'context': 'These questions evaluate your account management and expansion strategies.'
-    },
-    'Delivery & Client Experience': {
-      'importance': 'This area assesses how consistently you deliver value and manage client experiences.',
-      'impact': 'Excellent delivery drives client satisfaction, referrals, and repeat business.',
-      'context': 'These questions examine your project management and client experience capabilities.'
-    },
-    'Retention, Referrals & Relationship Growth': {
-      'importance': 'This area evaluates your ability to retain clients and generate referrals.',
-      'impact': 'Strong retention and referral systems create sustainable, predictable revenue growth.',
-      'context': 'These questions assess your client relationship management and advocacy programs.'
-    }
-  }
-  
-  if question_category in category_explanations:
-    explanation = category_explanations[question_category]
-    generate_question_explanation = '<div class="agent-explanation" style="padding: 0.5rem; background: rgba(255, 255, 255, 0.6); border-radius: 6px; margin-bottom: 0.5rem;"><strong>Why This Matters:</strong> ' + explanation['importance'] + '<br><strong>Business Impact:</strong> ' + explanation['impact'] + '<br><strong>Assessment Context:</strong> ' + explanation['context'] + '</div>'
-  else:
-    generate_question_explanation = ''
-
----
-# =============================================================================
-# INDUSTRY INSIGHT GENERATOR
-# =============================================================================
-# Purpose: Generate industry-specific examples and insights
-# Input: Current question data, user context with industry information
-# Output: HTML industry-specific content
-# Usage: Provides relevant examples and context based on user's industry
-
-id: generate_industry_insight
-sets: generate_industry_insight
-depends on:
-  - user_context
-  - current_question_data
-reconsider: True
-code: |
-  # INDUSTRY INSIGHT GENERATOR
-  # Generates industry-specific examples and insights
-  
-  industry = user_context.get('industry', '') if defined('user_context') else ''
-  question_category = current_question_data.get('category', '') if defined('current_question_data') else ''
-  
-  # Industry-specific insights and examples
-  industry_insights = {
-    'Technology': {
-      'Positioning and Differentiation': 'In tech consulting, differentiation often comes from specific technologies (AI/ML, cloud platforms) or methodologies (Agile, DevOps). Consider how your technical expertise sets you apart.',
-      'Service Offering and Value Design': 'Tech firms often struggle with service standardization. Think about how you package technical expertise into repeatable offerings.',
-      'Client Growth & Demand Generation': 'Technology clients often have rapid growth cycles. Consider how you scale with their evolving needs.',
-      'Delivery & Client Experience': 'Tech projects often involve complex integrations. Think about your project management and technical delivery processes.',
-      'Retention, Referrals & Relationship Growth': 'Tech clients value innovation and technical excellence. Consider how you maintain relationships through technology evolution.'
-    },
-    'Healthcare': {
-      'Positioning and Differentiation': 'Healthcare consulting requires deep regulatory knowledge. Consider how your compliance expertise differentiates you.',
-      'Service Offering and Value Design': 'Healthcare services often involve regulatory compliance. Think about how you standardize complex regulatory processes.',
-      'Client Growth & Demand Generation': 'Healthcare organizations have long decision cycles. Consider your relationship-building and trust-establishment processes.',
-      'Delivery & Client Experience': 'Healthcare projects often involve patient safety. Think about your quality assurance and risk management processes.',
-      'Retention, Referrals & Relationship Growth': 'Healthcare is relationship-driven. Consider how you build long-term partnerships in this trust-based industry.'
-    },
-    'Financial Services': {
-      'Positioning and Differentiation': 'Financial services consulting requires deep regulatory and risk expertise. Consider how your compliance knowledge differentiates you.',
-      'Service Offering and Value Design': 'Financial services often involve complex regulatory requirements. Think about how you package compliance expertise.',
-      'Client Growth & Demand Generation': 'Financial institutions value stability and expertise. Consider how you demonstrate long-term value and expertise.',
-      'Delivery & Client Experience': 'Financial projects often involve risk management. Think about your quality control and risk mitigation processes.',
-      'Retention, Referrals & Relationship Growth': 'Financial services value trust and expertise. Consider how you maintain relationships through regulatory changes.'
-    },
-    'Professional Services': {
-      'Positioning and Differentiation': 'Professional services consulting often competes on expertise and relationships. Consider how your specialized knowledge differentiates you.',
-      'Service Offering and Value Design': 'Professional services often involve complex problem-solving. Think about how you standardize consulting methodologies.',
-      'Client Growth & Demand Generation': 'Professional services clients value expertise and results. Consider how you demonstrate value and build long-term relationships.',
-      'Delivery & Client Experience': 'Professional services projects often involve strategic thinking. Think about your methodology and client engagement processes.',
-      'Retention, Referrals & Relationship Growth': 'Professional services are relationship-driven. Consider how you build advocacy and referral programs.'
-    }
-  }
-  
-  if industry in industry_insights and question_category in industry_insights[industry]:
-    insight = industry_insights[industry][question_category]
-    generate_industry_insight = '<div class="agent-industry-insight" style="padding: 0.5rem; background: rgba(255, 255, 255, 0.6); border-radius: 6px; margin-bottom: 0.5rem;"><strong>Industry Context (' + industry + '):</strong> ' + insight + '</div>'
-  else:
-    generate_industry_insight = ''
-
----
-# =============================================================================
-# ROLE GUIDANCE GENERATOR
-# =============================================================================
-# Purpose: Generate role-specific guidance and perspectives
-# Input: Current question data, user context with role information
-# Output: HTML role-specific guidance content
-# Usage: Provides relevant guidance based on user's role in the organization
-
-id: generate_role_guidance
-sets: generate_role_guidance
-depends on:
-  - user_context
-  - current_question_data
-reconsider: True
-code: |
-  # ROLE GUIDANCE GENERATOR
-  # Generates role-specific guidance and perspectives
-  
-  role = user_context.get('role', '') if defined('user_context') else ''
-  question_category = current_question_data.get('category', '') if defined('current_question_data') else ''
-  
-  # Role-specific guidance
-  role_guidance = {
-    'Executive/CEO': {
-      'general': 'As an executive, consider the strategic implications of your responses. Think about how these capabilities impact overall business performance and competitive position.',
-      'Positioning and Differentiation': 'Consider how your market positioning drives business growth and competitive advantage.',
-      'Service Offering and Value Design': 'Think about how your service portfolio supports strategic objectives and revenue goals.',
-      'Client Growth & Demand Generation': 'Consider how client growth capabilities impact business scalability and market expansion.',
-      'Delivery & Client Experience': 'Think about how delivery excellence supports client satisfaction and business reputation.',
-      'Retention, Referrals & Relationship Growth': 'Consider how retention and referral capabilities drive sustainable revenue growth.'
-    },
-    'Senior Manager': {
-      'general': 'As a senior manager, consider both strategic and operational aspects. Think about how these capabilities impact team performance and organizational effectiveness.',
-      'Positioning and Differentiation': 'Consider how clear positioning helps your team understand their role in market success.',
-      'Service Offering and Value Design': 'Think about how well-defined services enable consistent team performance and client delivery.',
-      'Client Growth & Demand Generation': 'Consider how client growth processes support team objectives and business development.',
-      'Delivery & Client Experience': 'Think about how delivery processes impact team efficiency and client satisfaction.',
-      'Retention, Referrals & Relationship Growth': 'Consider how retention processes support team success and business growth.'
-    },
-    'Department Head': {
-      'general': 'As a department head, consider how these capabilities impact your department\'s effectiveness and contribution to organizational goals.',
-      'Positioning and Differentiation': 'Consider how clear positioning helps your department align with market opportunities.',
-      'Service Offering and Value Design': 'Think about how service clarity enables effective department operations and client delivery.',
-      'Client Growth & Demand Generation': 'Consider how client growth processes support department objectives and business development.',
-      'Delivery & Client Experience': 'Think about how delivery processes impact department performance and client satisfaction.',
-      'Retention, Referrals & Relationship Growth': 'Consider how retention processes support department success and business growth.'
-    },
-    'Team Lead': {
-      'general': 'As a team lead, consider how these capabilities impact your team\'s day-to-day effectiveness and client delivery.',
-      'Positioning and Differentiation': 'Consider how clear positioning helps your team understand their value proposition.',
-      'Service Offering and Value Design': 'Think about how service clarity enables consistent team performance and client delivery.',
-      'Client Growth & Demand Generation': 'Consider how client growth processes support team objectives and business development.',
-      'Delivery & Client Experience': 'Think about how delivery processes impact team efficiency and client satisfaction.',
-      'Retention, Referrals & Relationship Growth': 'Consider how retention processes support team success and business growth.'
-    },
-    'Consultant': {
-      'general': 'As a consultant, consider how these capabilities impact your ability to deliver value to clients and contribute to business success.',
-      'Positioning and Differentiation': 'Consider how clear positioning helps you understand your role in client success.',
-      'Service Offering and Value Design': 'Think about how service clarity enables effective client delivery and project success.',
-      'Client Growth & Demand Generation': 'Consider how client growth processes support your professional development and business contribution.',
-      'Delivery & Client Experience': 'Think about how delivery processes impact your effectiveness and client satisfaction.',
-      'Retention, Referrals & Relationship Growth': 'Consider how retention processes support your professional success and business growth.'
-    }
-  }
-  
-  if role in role_guidance:
-    if question_category in role_guidance[role]:
-      guidance = role_guidance[role][question_category]
-    else:
-      guidance = role_guidance[role]['general']
-    
-    generate_role_guidance = '<div class="agent-role-guidance" style="padding: 0.5rem; background: rgba(255, 255, 255, 0.6); border-radius: 6px; margin-bottom: 0.5rem;"><strong>Role Perspective (' + role + '):</strong> ' + guidance + '</div>'
-  else:
-    generate_role_guidance = ''
+            content_sections.append(f"<strong>Growth Opportunity:</strong> {low_percentage:.0f}% of your responses indicate significant improvement potential, representing substantial growth opportunities.")
+      
+      # Dynamic category analysis
+      fallback_category = derived_category
+      if fallback_category:
+        category_responses = [r for r in response_history if r['category'] == fallback_category]
+        if category_responses:
+          category_strength = sum(1 for r in category_responses if r['response_level'] == 'High')
+          if category_strength == len(category_responses):
+            content_sections.append(f"<strong>Category Strength:</strong> You're showing consistent strength in {fallback_category}, indicating this is a well-developed organizational capability.")
+          elif category_strength == 0:
+            content_sections.append(f"<strong>Focus Area:</strong> {fallback_category} appears to be a key area for development, representing significant growth potential.")
+      
+      # Dynamic contextual guidance
+      if user_context['industry'] != 'Not specified' and derived_category:
+        content_sections.append(f"<strong>Industry Context ({user_context['industry']}):</strong> Consider how {derived_category.lower()} impacts your competitive position in the {user_context['industry']} sector.")
+      
+      if user_context['role'] != 'Not specified' and derived_category:
+        content_sections.append(f"<strong>Role Perspective ({user_context['role']}):</strong> Think about how {derived_category.lower()} aligns with your responsibilities and strategic objectives.")
+      
+      # Dynamic progress insights
+      progress = user_context['progress_percentage']
+      if progress < 25:
+        content_sections.append("<strong>Assessment Context:</strong> You're in the early stages of this assessment. Focus on providing honest, accurate responses to get the most value from the analysis.")
+      elif progress < 75:
+        content_sections.append("<strong>Assessment Context:</strong> You're making good progress. The patterns in your responses are becoming clearer, providing valuable insights.")
+      else:
+        content_sections.append("<strong>Assessment Context:</strong> You're nearing completion. The comprehensive analysis will provide detailed insights into your organizational capabilities.")
+      
+      if content_sections:
+        generate_intelligence_agent_content = '<div style="padding-top: 10px;">' + '<br><br>'.join(content_sections) + '</div>'
+      else:
+        generate_intelligence_agent_content = '<div style="padding-top: 10px;"><strong>Welcome to your assessment!</strong> As you progress through the questions, I\'ll provide dynamic, personalized insights based on your responses and context.</div>'
 

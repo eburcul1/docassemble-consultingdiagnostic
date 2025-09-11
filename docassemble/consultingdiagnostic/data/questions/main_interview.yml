@@ -2,7 +2,7 @@
 metadata:
   title: Consulting Services Diagnostic
   short title: 
-  version: "1.0.0"
+  version: "0.0.3"
   description: |
     Complete diagnostic system for consulting services.
     
@@ -10,7 +10,7 @@ metadata:
     - User information collection and validation
     - Dynamic question loading from CSV with 25 assessment questions
     - Real-time scoring and industry benchmarking
-    - AI-powered insights generation using OpenAI
+    - AI-powered contextual help generation using OpenAI (category-specific)
     - Professional report generation with Word templates
     - Visualizations (radar and lollipop charts)
     - Pain points analysis and service recommendations
@@ -23,6 +23,7 @@ metadata:
     - Pickle-safe document processing
     - State management for complex navigation flows
     - Background processing for AI content generation
+    - Category-aware help system with intelligent regeneration
     
     Dependencies:
     
@@ -42,9 +43,10 @@ metadata:
     # =============================================================================
     # ASSESSMENT CORE LOGIC
     # =============================================================================
-    - questions.yml: Assessment questions and scoring
+    - questions.yml: Assessment questions and scoring with category-aware help
     - scoring.yml: Score calculation algorithms
     - assessment_logic.yml: Main business logic and flow control
+    - assessment_intelligence_agent.yml: AI-powered contextual help generation
     
     # =============================================================================
     # VISUALIZATION COMPONENTS
@@ -92,12 +94,12 @@ metadata:
     - document-generation
   exit link: off
   logo: |
-    <img src="/packagestatic/docassemble.playground1Sept9AgenticImprovements/logo.png" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">
+    <img src="/packagestatic/docassemble.playground1Aug25Optimization/logo.png" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">
   
   head: |
-    <link rel="icon" type="image/png" href="packagestatic/docassemble.playground1Sept9AgenticImprovements/logo.png">
-    <link rel="shortcut icon" type="image/png" href="packagestatic/docassemble.playground1Sept9AgenticImprovements/logo.png">
-    <link rel="apple-touch-icon" type="image/png" href="packagestatic/docassemble.playground1Sept9AgenticImprovements/logo.png">
+    <link rel="icon" type="image/png" href="packagestatic/docassemble.playground1Aug25Optimization/logo.png">
+    <link rel="shortcut icon" type="image/png" href="packagestatic/docassemble.playground1Aug25Optimization/logo.png">
+    <link rel="apple-touch-icon" type="image/png" href="packagestatic/docassemble.playground1Aug25Optimization/logo.png">
   
   footer: |
     <div class="ve-footer">

@@ -73,10 +73,14 @@ code: |
   if not defined('current_question'):
     current_question = 0
   
+  # Set initial current category for first question
+  if defined('questions') and current_question < len(questions) and not defined('current_category'):
+    current_category = questions[current_question]['category']
+  
   # Check if we need to collect category feedback
   if defined('need_category_feedback') and not defined('feedback_provided'):
     # Ask for feedback - this will trigger the ask_category_feedback question
-    feedback_provided
+    ask_category_feedback
   
   # If feedback was just provided, clean up and continue
   if defined('feedback_provided') and defined('need_category_feedback'):
@@ -310,6 +314,18 @@ help: |
         });
       } catch(e) {}
     })();
+
+    // Replace the default help heading text
+    (function tweakHelpHeading(){
+      try {
+        var candidates = Array.prototype.slice.call(document.querySelectorAll('h1, h2, .da-page-title, .page-header h1, .page-header h2'));
+        var heading = candidates.find(function(el){
+          var t = (el.innerText || el.textContent || '').trim().toLowerCase();
+          return t === 'help with this question' || t.indexOf('help with this question') !== -1;
+        });
+        if (heading) heading.textContent = 'Help with this category';
+      } catch(e) {}
+    })();
   </script>
   
   <div style="margin-top: 30px; text-align: center;">
@@ -347,7 +363,21 @@ validation code: |
     log(f"🔄 Category '{need_category_feedback}' completed, will ask for feedback")
   
   # Move to next question
+  # Track previous category to decide if help should refresh
+  prev_category = questions[current_question]['category'] if (defined('questions') and current_question < len(questions)) else ''
   current_question += 1
+  
+  # Update current category when question changes
+  if defined('questions') and current_question < len(questions):
+    current_category = questions[current_question]['category']
+  
+  # Refresh AI help ONLY if category changed
+  if defined('generate_intelligence_agent_content'):
+    try:
+      if defined('current_category') and current_category != prev_category:
+        del generate_intelligence_agent_content
+    except Exception:
+      pass
   
   # Force regeneration of choices for the next question
   if defined('current_question_choices'):

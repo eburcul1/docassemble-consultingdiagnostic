@@ -205,6 +205,14 @@ code: |
   if not defined('current_question'):
     current_question = 0
   
+  # Initialize current category - this will be updated when question changes
+  if not defined('current_category'):
+    current_category = ''
+  
+  # Initialize help request counter for forcing regeneration
+  if not defined('help_request_count'):
+    help_request_count = 0
+  
   # Ensure answers plain list is properly set up when questions are loaded
   if defined('questions') and questions and not defined('answers_properly_initialized'):
     # Initialize as plain Python list (not DAList to avoid pickle errors)

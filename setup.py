@@ -44,9 +44,9 @@ def find_package_data(where='.', package='', exclude=standard_exclude, exclude_d
     return out
 
 setup(name='docassemble.consultingdiagnostic',
-      version='0.0.2',
-      description=('A docassemble extension. assessment_intelligence (hardcoded)'),
-      long_description='launch from main_interview.yml\r\nrequires an OpenAI key in config file for AI gen\r\nIntroduces assessment_intelligenct_agent to mimic agentic AI for question context(but it all hardcoded)',
+      version='0.0.3',
+      description=('A docassemble extension. assessment_intelligence (AI enabled help for each category)'),
+      long_description='launch from main_interview.yml\r\nrequires an OpenAI key in config file for AI gen\r\nIntroduces assessment_intelligence_agent (uses AI to show category help) ',
       long_description_content_type='text/markdown',
       author='System Administrator',
       author_email='burcul_elvis@hotmail.com',
