@@ -1,27 +1,61 @@
 ---
 metadata:
-  title: pain_points.yml - Simple Pain Points Loader
+  title: pain_points.yml - Interactive Pain Points Prioritization
 
 ---
+# =============================================================================
+# PAIN POINTS DATA LOADER
+# =============================================================================
+# Purpose: Load and prepare business challenge/pain point data from CSV file
+# Input: pain_points.csv file with business challenges and descriptions
+# Output: pain_points_csv_data dictionary and pain_points_choices_list for UI
+# Usage: Provides data for interactive drag-and-drop prioritization before the main assessment
+# Dependencies: pain_points.csv file must exist in the package
+
 initial: True
 id: pain_points_loaded
 code: |
+  """
+  PAIN POINTS CSV LOADER
+  
+  This block loads business challenges/pain points from a CSV file and prepares
+  them for use in the interactive prioritization system. The data is used to:
+  1. Present users with an interactive drag-and-drop table to prioritize challenges
+  2. Automatically select the top 3 prioritized challenges for AI recommendations
+  3. Provide context for the assessment questions and final recommendations
+  
+  CSV Structure Expected:
+  - ID: Unique identifier for the pain point
+  - Category: Business category (e.g., "Marketing", "Operations")
+  - Title: Short title/name of the challenge
+  - Description: Detailed description of the challenge
+  
+  Output:
+  - pain_points_csv_data: Dictionary of pain point objects
+  - pain_points_choices_list: Formatted list for DocAssemble checkboxes (legacy support)
+  """
+  
   import csv
   from docassemble.base.util import path_and_mimetype
   
+  # Initialize empty dictionary to store pain point data
   pain_points_csv_data = {}
   
   try:
+    # Load the pain_points.csv file using DocAssemble's file handling
     file_path, _ = path_and_mimetype('pain_points.csv')
     with open(file_path, encoding='utf-8') as f:
       reader = list(csv.DictReader(f))
       
+      # Process each row in the CSV file
       for row in reader:
+        # Extract and clean data from CSV columns
         pain_id = (row['ID'] if 'ID' in row else '').strip()
         category = (row['Category'] if 'Category' in row else '').strip()
         title = (row['Title'] if 'Title' in row else '').strip()
         description = (row['Description'] if 'Description' in row else '').strip()
         
+        # Only add pain points that have a valid ID
         if pain_id:
           pain_points_csv_data[pain_id] = {
             'id': pain_id,
@@ -33,50 +67,207 @@ code: |
     log(f"✅ Loaded {len(pain_points_csv_data)} pain points from CSV")
     
   except Exception as e:
+    # Graceful error handling - continue with empty data if CSV fails to load
     log(f"⚠️ Error loading pain points CSV: {e}")
     pain_points_csv_data = {}
   
+  # Mark pain points as loaded for dependency tracking
   pain_points_loaded = True
 
 ---
+# =============================================================================
+# PAIN POINTS CHOICES PREPARATION (LEGACY SUPPORT)
+# =============================================================================
+# Purpose: Convert loaded pain point data into DocAssemble checkbox format (legacy)
+# Input: pain_points_csv_data dictionary from the loader
+# Output: pain_points_choices_list formatted for UI checkboxes
+# Usage: Legacy support for checkbox format (now using interactive drag-and-drop prioritization)
+
 code: |
+  """
+  PAIN POINTS CHOICES FORMATTER (LEGACY)
+  
+  This block converts the loaded pain point data into the format required
+  by DocAssemble checkboxes. It creates a list of tuples where each tuple
+  contains (value, display_text) for the checkbox options.
+  
+  NOTE: This is now legacy support. The main prioritization system uses
+  interactive drag-and-drop tables instead of checkboxes.
+  """
+  
   # Create choices as a list of tuples for DocAssemble checkboxes
   pain_points_choices_list = []
+  
+  # Add each pain point as a checkbox option
   for pain_id, data in pain_points_csv_data.items():
     pain_points_choices_list.append((pain_id, data['title']))
-  # Add "None of the above" option
+  
+  # Add "None of the above" option for users who don't identify with listed challenges
   pain_points_choices_list.append(('none_above', 'None of the above'))
 
 ---
+# =============================================================================
+# INTERACTIVE PAIN POINTS PRIORITIZATION
+# =============================================================================
+# Purpose: Present users with interactive drag-and-drop prioritization of business challenges
+# Input: pain_points data from CSV loaded via build_painpoints_prioritization
+# Output: user_selected_challenges (top 3 automatically selected) and collect_pain_points_complete flag
+# Usage: Collects user priorities through interactive reordering to enable targeted AI insights
+# Dependencies: DAList objects for painpoints_prioritization and prioritized_painpoints
+# Flow: User drags/drops to prioritize → Top 3 automatically selected → Data passed to AI recommendations
+
+objects:
+  - painpoints_prioritization: DAList.using(auto_gather=False)
+  - prioritized_painpoints: DAList.using(auto_gather=False)
+
+---
+id: build_painpoints_prioritization
+code: |
+  """
+  BUILD PRIORITIZATION DATA STRUCTURE
+  
+  This block creates the DAList structure needed for the interactive drag-and-drop
+  prioritization table. It loads pain points from CSV and configures them as
+  DAObject items that can be reordered by the user.
+  
+  Process:
+  1. Ensure CSV data is loaded first
+  2. Configure DAList object type for pain point items
+  3. Load pain points from CSV into prioritization list
+  4. Mark as initialized to prevent duplicate loading
+  """
+  
+  # Ensure CSV data is loaded first
+  need('pain_points_loaded')
+  
+  # Configure the row object type to hold CSV fields
+  from docassemble.base.util import DAObject
+  painpoints_prioritization.object_type = DAObject
+  
+  # Populate only once
+  if not defined('painpoints_prioritization_initialized') or not painpoints_prioritization_initialized:
+    import csv
+    from docassemble.base.util import path_and_mimetype
+    file_path, _ = path_and_mimetype('pain_points.csv')
+    with open(file_path, encoding='utf-8') as f:
+      rows = list(csv.DictReader(f))
+    # Clear any existing items to avoid duplicates
+    try:
+      while len(painpoints_prioritization):
+        painpoints_prioritization.pop()
+    except Exception:
+      pass
+    for row in rows:
+      item = painpoints_prioritization.appendObject()
+      item.id = (row.get('ID') or '').strip()
+      item.category = (row.get('Category') or '').strip()
+      item.title = (row.get('Title') or '').strip()
+      item.description = (row.get('Description') or '').strip()
+    painpoints_prioritization.gathered = True
+    painpoints_prioritization_initialized = True
+
+---
+mandatory: False
+id: reorder_table
 question: |
-  ### Whats Most Important to You
+  ### What's Most Important to You
   
   <div class="assessment-card">
-  Before we dive into the assessment, help us understand what's most important to you. Select the top three common business challenges (those most important to you)from the list below. This helps us provide more targeted insights and recommendations.
+  Before we dive into the assessment, help us understand what's most important to you. 
+  Use the arrows to prioritize these common industry challenges from most important to least important. 
+  This helps us provide more targeted insights and recommendations.
   </div>
+
+  ${ pain_table }
+
 help: |
   **Challenge Descriptions:**
   
-  % for pain_id, data in pain_points_csv_data.items():
-  - **${ data['title'] }**: ${ data['description'] }
+  % for item in painpoints_prioritization:
+  - **${ item.title }**: ${ item.description }
   % endfor
 
-fields:
-  - no label: user_selected_challenges
-    datatype: checkboxes
-    minlength: 1
-    maxlength: 3
-    code: pain_points_choices_list
-    item grid: 6
-    validation messages:
-      minlength: Please select at least 1 issue.
-      maxlength: Please select a maximum of 3 issues.
-  - If you selected "None of the above", please tell us what challenges your firm faces: user_information['custom_challenges']
-    datatype: area
-    required: False
-    show if:
-      variable: user_selected_challenges['none_above']
-      is: True
-    help: |
-      Please describe the specific challenges or obstacles your consulting firm faces that weren't covered in the list above.
-continue button field: collect_pain_points_complete 
+field: table_edited
+show if: defined('user_info_collected') and user_info_collected
+
+---
+mandatory: False
+code: |
+  """
+  PROCESS PRIORITIZATION RESULTS
+  
+  This block processes the user's drag-and-drop prioritization and converts it
+  into the format expected by the rest of the system. It automatically selects
+  the top 3 prioritized challenges for AI recommendations.
+  
+  Process:
+  1. Ensure prioritization data is built
+  2. Wait for user to complete drag-and-drop reordering
+  3. Build ranked list from user's prioritization
+  4. Convert top 3 to user_selected_challenges format
+  5. Mark completion for flow control
+  """
+  
+  # Build/prereq: ensure prioritization list is built exactly once
+  need('build_painpoints_prioritization')
+  
+  # Trigger the prioritization question and wait for completion
+  table_edited
+  
+  # Build a prioritized list (rank starts at 1) using all visible rows in their order
+  prioritized_painpoints.clear()
+  rank = 1
+  for item in painpoints_prioritization:
+    rec = DADict()
+    rec['rank'] = rank
+    rec['id'] = getattr(item, 'id', '')
+    rec['category'] = getattr(item, 'category', '')
+    rec['title'] = getattr(item, 'title', '')
+    prioritized_painpoints.append(rec)
+    rank += 1
+  prioritized_painpoints.gathered = True
+  
+  # Convert prioritized list to user_selected_challenges format (top 3 only)
+  user_selected_challenges = {}
+  
+  # Select top 3 from prioritized list
+  top_3_count = min(3, len(prioritized_painpoints))
+  for i in range(top_3_count):
+    if i < len(prioritized_painpoints):
+      pain_id = prioritized_painpoints[i]['id']
+      user_selected_challenges[pain_id] = True
+  
+  # Add "none_above" as False (not selected)
+  user_selected_challenges['none_above'] = False
+  
+  # Mark as complete
+  collect_pain_points_complete = True
+
+---
+code: |
+  """
+  TABLE DATA SOURCE
+  
+  Provides explicit rows source for the drag-and-drop table to avoid implicit recursion.
+  This ensures the table has the properly loaded and configured pain points data.
+  """
+  
+  # Provide explicit rows source for the table to avoid implicit recursion
+  need('build_painpoints_prioritization')
+  painpoints_for_table = painpoints_prioritization
+
+---
+# =============================================================================
+# INTERACTIVE DRAG-AND-DROP PRIORITIZATION TABLE
+# =============================================================================
+# Purpose: Interactive table allowing users to drag and drop pain points to prioritize them
+# Input: painpoints_for_table (loaded from CSV via build_painpoints_prioritization)
+# Output: User's prioritized order captured in table_edited field
+# Usage: Users drag rows to reorder, system automatically selects top 3 for AI recommendations
+# Features: Drag-and-drop reordering, challenge descriptions in help panel
+
+table: pain_table
+rows: painpoints_for_table
+columns:
+  - Title: row_item.title
+allow reordering: True 

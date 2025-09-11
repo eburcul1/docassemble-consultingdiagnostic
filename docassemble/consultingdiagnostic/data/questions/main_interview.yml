@@ -2,12 +2,13 @@
 metadata:
   title: Consulting Services Diagnostic
   short title: 
-  version: "0.0.3"
+  version: "0.0.4"
   description: |
     Complete diagnostic system for consulting services.
     
     Features:
     - User information collection and validation
+    - Interactive drag-and-drop pain points prioritization
     - Dynamic question loading from CSV with 25 assessment questions
     - Real-time scoring and industry benchmarking
     - AI-powered contextual help generation using OpenAI (category-specific)
@@ -38,7 +39,7 @@ metadata:
     # DATA PROCESSING & LOADING
     # =============================================================================
     - data_loader.yml: CSV data loading and processing
-    - pain_points.yml: Pain points analysis
+    - pain_points.yml: Interactive pain points prioritization
     
     # =============================================================================
     # ASSESSMENT CORE LOGIC

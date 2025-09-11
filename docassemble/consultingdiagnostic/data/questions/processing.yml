@@ -47,7 +47,7 @@ logo: |
 subquestion: |
   <div class="progress-card">
 
-    <div class="subtitle">This will about 45–60 seconds for processing and an additional 10-15 seconds for final documentassembly.</div>
+    <div class="subtitle">This will about 45–60 seconds for processing and an additional 10-15 seconds for final document assembly.</div>
 
     <div class="progress-row">
       <div class="progress flex-grow-1" style="height: 10px;">
@@ -449,7 +449,7 @@ code: |
           prompt = config['user_template'].replace('{formatted_data}', formatted_data)
         
         response = client.chat.completions.create(
-          model=config.get('model', 'gpt-4o-mini'),
+          model=config.get('model', 'gpt-4.1-mini'),
           messages=[
             {"role": "system", "content": config['system']},
             {"role": "user", "content": prompt}
@@ -469,7 +469,7 @@ code: |
         prompt = config['user_template'].replace('{formatted_data}', formatted_data)
         
         response = client.chat.completions.create(
-          model=config.get('model', 'gpt-4o-mini'),
+          model=config.get('model', 'gpt-4.1-mini'),
           messages=[
             {"role": "system", "content": config['system']},
             {"role": "user", "content": prompt}

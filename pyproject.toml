@@ -6,8 +6,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docassemble.consultingdiagnostic"
-version = "0.0.3"
-description = "A docassemble extension. assessment_intelligence (AI enabled help for each category)"
+version = "0.0.4"
+description = "AI enabled help for each category, new prioritization screen for pain points."
 readme = "README.md"
 authors = [
     { name = "System Administrator", email = "burcul_elvis@hotmail.com" },
