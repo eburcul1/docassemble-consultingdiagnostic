@@ -2,7 +2,7 @@
 metadata:
   title: Consulting Services Diagnostic
   short title: 
-  version: "0.0.6"
+  version: "0.0.7"
   description: |
     Complete diagnostic system for consulting services.
     
@@ -882,6 +882,242 @@ code: |
   except Exception as _e:
     log(f"⚠️ Failed to set other_available_offerings: {_e}")
 
+  # ===========================================================================
+  # PRECOMPUTE ANSWER LEVELS AND NEXT BEST ACTIONS FOR DOCX TEMPLATE
+  # ===========================================================================
+  # Purpose: Preprocess assessment data to provide clean, structured variables
+  # for the Word document Jinja2 template, eliminating complex parsing logic
+  # in the DOCX template itself.
+  #
+  # Key Changes (v0.0.7):
+  # - Precomputes answer_levels: numeric level (0-4) for each user response
+  # - Generates next_best_actions_single: single improvement text per question
+  # - Creates improvement_matrix: full 5-item improvement arrays for template access
+  # - Extracts question_prompts: clean question text for template display
+  # - Supports configurable level_prefix_style (letter/number/none) from config
+  # - Handles both dict-like and object-like question structures
+  # - Provides fallback to CSV data when question fields are missing
+  #
+  # Template Usage: The DOCX template now uses these precomputed variables
+  # instead of complex Jinja2 logic, ensuring reliable improvement text display.
+  try:
+    # Ensure dependencies are available
+    need('formatting_config')
+
+    # Use the globally selected style if available; fall back to config
+    parsing_style = None
+    try:
+      parsing_style = global_level_style if defined('global_level_style') else level_prefix_style
+    except Exception:
+      parsing_style = level_prefix_style if defined('level_prefix_style') else 'letter'
+
+    # Core template variables for DOCX rendering
+    answer_levels = []                    # Numeric level (0-4) for each user response
+    next_best_actions = []               # Legacy: level-specific improvement arrays
+    next_best_actions_single = []        # Primary: single improvement text per question
+    improvement_matrix = []              # Full 5-item improvement arrays for template access
+    question_prompts = []                # Clean question text extracted for template display
+
+    # Fallback source from CSV (guaranteed to exist in package)
+    # Used when question objects lack proper levels/improvements fields
+    csv_improvements_by_index = []
+    csv_prompts_by_index = []
+    try:
+      import csv as _csv
+      from docassemble.base.util import path_and_mimetype as _pam
+      _fp, _ = _pam('FinalQuestionsIDwScore.csv')
+      with open(_fp, encoding='utf-8') as _f:
+        _reader = list(_csv.DictReader(_f))
+        for _row in _reader:
+          # Build improvements list of length 5 with fallbacks
+          _imps = []
+          for _k in range(5):
+            _ival = (_row.get(f'Improvement{_k}', '') or '').strip()
+            _imps.append(_ival if _ival else 'Continue current practices')
+          csv_improvements_by_index.append(_imps)
+          csv_prompts_by_index.append((_row.get('Prompt', '') or '').strip())
+    except Exception as _csv_err:
+      log(f"⚠️ CSV fallback unavailable: {_csv_err}")
+
+    def _get_field(obj, key, default=None):
+      """Safely get a field from dict-like or object-like containers."""
+      try:
+        if isinstance(obj, dict):
+          return obj.get(key, default)
+      except Exception:
+        pass
+      try:
+        val = getattr(obj, key)
+        return val if val is not None else default
+      except Exception:
+        pass
+      try:
+        return obj[key]
+      except Exception:
+        return default
+
+    # Helper to parse a single answer into level index (0-4), None if unknown
+    def _parse_level_from_answer(answer_str, levels, style):
+      if not answer_str or not levels:
+        return None
+      s = str(answer_str).strip()
+      # Letter style: "A: ..."
+      if style == 'letter' and len(s) >= 2 and s[1] == ':':
+        first = s[0].upper()
+        if defined('level_mapping') and first in level_mapping:
+          idx = level_mapping.get(first, None)
+          if idx is not None and 0 <= idx < len(levels):
+            return idx
+      # Number style: "1: ..."
+      if style == 'number' and len(s) >= 2 and s[1] == ':' and s[0].isdigit():
+        num = int(s[0])
+        idx = num - 1
+        if 0 <= idx < len(levels):
+          return idx
+      # None style: description only
+      if style == 'none':
+        for i, lvl in enumerate(levels):
+          if lvl and str(lvl).strip().lower() == s.lower():
+            return i
+        for i, lvl in enumerate(levels):
+          if lvl and str(lvl).lower() in s.lower():
+            return i
+      # Fallback: try matching description after ':' for any style
+      parts = s.split(':', 1)
+      desc = parts[1].strip().lower() if len(parts) > 1 else s.lower()
+      for i, lvl in enumerate(levels):
+        if lvl and str(lvl).strip().lower() == desc:
+          return i
+      return None
+
+    # Build arrays aligned with questions
+    if defined('questions') and questions and defined('answers') and answers:
+      q_len = len(questions)
+      a_len = len(answers)
+      for i in range(q_len):
+        q = questions[i]
+        ans = answers[i] if i < a_len else None
+        lvls = _get_field(q, 'levels', []) or []
+        impr = _get_field(q, 'improvements', []) or []
+
+        # Build a synthesized 5-item improvements list from either fields or array
+        synth_impr = []
+        try:
+          for _k in range(5):
+            # Prefer explicit Improvement{n} fields if present
+            from_field = _get_field(q, f'Improvement{_k}', None)
+            from_array = None
+            try:
+              if impr and len(impr) > _k:
+                from_array = impr[_k]
+            except Exception:
+              from_array = None
+            chosen = (from_field if (isinstance(from_field, str) and from_field.strip()) else from_array)
+            chosen = (chosen or '').strip()
+            if not chosen:
+              chosen = 'Continue current practices'
+            synth_impr.append(chosen)
+        except Exception:
+          # Last resort: ensure a 5-length list of fallbacks
+          synth_impr = ['Continue current practices'] * 5
+
+        # If synth_impr still looks empty/fallback-only and CSV has data for this index, use CSV
+        try:
+          if i < len(csv_improvements_by_index):
+            # Replace any empty entries with CSV entries
+            _csv_imps = csv_improvements_by_index[i]
+            _final_imps = []
+            for _k in range(5):
+              _local = (synth_impr[_k] if len(synth_impr) > _k else '')
+              if not _local or _local == 'Continue current practices':
+                _local = _csv_imps[_k]
+              _final_imps.append(_local if _local else 'Continue current practices')
+            synth_impr = _final_imps
+        except Exception:
+          pass
+
+        # If levels are missing, also rebuild from Maturity0..4
+        if not lvls or len(lvls) < 5:
+          try:
+            lvls = []
+            for _k in range(5):
+              mval = _get_field(q, f'Maturity{_k}', '')
+              lvls.append((mval or '').strip())
+          except Exception:
+            lvls = lvls or []
+
+        lvl_idx = _parse_level_from_answer(ans, lvls, parsing_style)
+        # Default unknown level to 0 for action lookup, but track None for status
+        level_for_action = lvl_idx if (isinstance(lvl_idx, int) and 0 <= lvl_idx <= 4) else 0
+
+        # Determine next best action text
+        if isinstance(lvl_idx, int) and lvl_idx == 4:
+          nba_text = "Status: You've reached the highest maturity level in this area. Focus on maintaining excellence."
+        else:
+          candidate = None
+          # Use synthesized improvements (guaranteed non-empty entries)
+          if synth_impr and 0 <= level_for_action < len(synth_impr):
+            candidate = synth_impr[level_for_action]
+          elif impr and 0 <= level_for_action < len(impr):
+            try:
+              candidate = impr[level_for_action]
+            except Exception:
+              candidate = None
+          # Normalize and fallback when empty/missing
+          if isinstance(candidate, str):
+            candidate = candidate.strip()
+          nba_text = candidate if candidate else 'Continue current practices'
+
+        answer_levels.append(lvl_idx if isinstance(lvl_idx, int) else 0)
+        next_best_actions.append(nba_text)
+
+        # SINGLE next best action per question (primary template variable)
+        # Maps user's selected level to the corresponding improvement text
+        # This is the main variable used by the DOCX template for recommendations
+        if isinstance(lvl_idx, int) and lvl_idx == 4:
+          nba_single = "Status: You've reached the highest maturity level in this area. Focus on maintaining excellence."
+        else:
+          # Check for single improvement field first (preferred)
+          single_field = None
+          for key in ('NextBestAction', 'Next_Best_Action', 'Improvement', 'improvement'):
+            val = _get_field(q, key, None)
+            if isinstance(val, str) and val.strip():
+              single_field = val.strip()
+              break
+          if single_field:
+            nba_single = single_field
+          else:
+            nba_single = nba_text  # fallback to level-based improvement
+
+        next_best_actions_single.append(nba_single)
+
+        # Store synthesized improvements row for template indexing
+        # Provides full 5-item array for advanced template logic if needed
+        improvement_matrix.append(synth_impr)
+
+        # Extract clean question prompt for template display
+        # Ensures the DOCX template gets readable question text without object access
+        _prompt = _get_field(q, 'prompt', None)
+        if not (isinstance(_prompt, str) and _prompt.strip()):
+          if i < len(csv_prompts_by_index):
+            _prompt = csv_prompts_by_index[i]
+        question_prompts.append((_prompt or '').strip())
+    else:
+      # Ensure variables exist even if unanswered
+      answer_levels = []
+      next_best_actions = []
+
+    # Expose precomputed variables to DOCX template
+    # These variables eliminate the need for complex Jinja2 logic in the Word document
+    define('answer_levels', answer_levels)                    # Numeric levels for each response
+    define('next_best_actions', next_best_actions)           # Legacy: level-specific arrays
+    define('next_best_actions_single', next_best_actions_single)  # Primary: single improvement per question
+    define('question_prompts', question_prompts)             # Clean question text for display
+    define('improvement_matrix', improvement_matrix)         # Full improvement arrays for advanced logic
+    log(f"📄 Prepared answer_levels ({len(answer_levels)}), next_best_actions ({len(next_best_actions)}), next_best_actions_single ({len(next_best_actions_single)}), improvement_matrix ({len(improvement_matrix)}), question_prompts ({len(question_prompts)})")
+  except Exception as _prep_err:
+    log(f"⚠️ Failed to precompute next_best_actions: {_prep_err}")
+
 ---
 # =============================================================================
 # ASSESSMENT RESULTS DISPLAY
@@ -903,30 +1139,6 @@ subquestion: |
   Your personalized diagnostic report has been generated and is ready for download below.
 
   
-  ---
-  
-  TESTING OUTPUT
-  ==============
-  
-  Top 3 Recommended Services
-  --------------------------
-  % if defined('top_three_offerings') and top_three_offerings:
-  %   for i, off in enumerate(top_three_offerings, 1):
-    ${ i }. ${ off }
-  %   endfor
-  % else:
-    No top three offerings available.
-  % endif
-  
-  Other Available Services
-  ------------------------
-  % if defined('other_available_offerings') and other_available_offerings:
-  %   for i, off in enumerate(other_available_offerings, 1):
-    ${ i }. ${ off }
-  %   endfor
-  % else:
-    No other services available.
-  % endif
 
 
 attachments:
@@ -934,7 +1146,7 @@ attachments:
   - name: Consulting Services Business Maturity Diagnostic Report
     filename: Consulting_Services_Business_Maturity_Diagnostic_${user_company.replace(' ', '_') if defined('user_company') and user_company else 'Assessment_Report'}
     docx template file: maturity_assessment_report.docx
-    # Template Variables Documentation:
+    # Template Variables Documentation (Updated v0.0.7):
     # AI-Generated Content:
     #   executive_summary: AI-generated executive summary of assessment results
     #   contradictions_insights: Strategic insights highlighting contradictions in responses
@@ -945,6 +1157,12 @@ attachments:
     #   user_company: Organization name for personalization and file naming
     #   user_role: Role classification for targeted recommendations
     #   user_industry: Industry context for benchmarking
+    # Precomputed Assessment Data (NEW in v0.0.7):
+    #   answer_levels: Numeric level (0-4) for each user response, used for improvement mapping
+    #   next_best_actions_single: Single improvement text per question (primary template variable)
+    #   question_prompts: Clean question text extracted for template display
+    #   improvement_matrix: Full 5-item improvement arrays for advanced template logic
+    #   next_best_actions: Legacy level-specific improvement arrays (maintained for compatibility)
     # Assessment Results:
     #   overall_score: Calculated maturity score (0-5 scale)
     #   industry_average: Benchmark score for comparison
@@ -970,6 +1188,18 @@ attachments:
       offering_document_files_list: ${offering_document_files_list if defined('offering_document_files_list') else []}
       top_three_offerings: ${top_three_offerings if defined('top_three_offerings') else []}
       merged_offering_content: ${merged_offering_content if defined('merged_offering_content') else 'No offering documents available'}
+      # Questions Data
+      questions: ${questions if defined('questions') else []}
+      individual_scores: ${individual_scores if defined('individual_scores') else []}
+      answers: ${answers if defined('answers') else []}
+      answer_levels: ${answer_levels if defined('answer_levels') else []}
+      next_best_actions: ${next_best_actions if defined('next_best_actions') else []}
+      next_best_actions_single: ${next_best_actions_single if defined('next_best_actions_single') else []}
+      question_prompts: ${question_prompts if defined('question_prompts') else []}
+      improvement_matrix: ${improvement_matrix if defined('improvement_matrix') else []}
+      global_level_style: ${global_level_style if defined('global_level_style') else 'letter'}
+      letter_choices: ${letter_choices if defined('letter_choices') else []}
+      level_mapping: ${level_mapping if defined('level_mapping') else {}}
       # Pain Points Data
       selected_pain_points_count: ${selected_pain_points_count if defined('selected_pain_points_count') else 0}
       pain_points_selected_count: ${pain_points_selected_count if defined('pain_points_selected_count') else 0}
