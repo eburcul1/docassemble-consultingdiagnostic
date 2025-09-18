@@ -1,11 +1,47 @@
 ---
+# =============================================================================
+# MAIN ASSESSMENT FLOW CONTROLLER
+# =============================================================================
+# Purpose: Orchestrate the complete assessment flow from start to finish
+# Input: User information, questions, pain points, AI processing
+# Output: Complete assessment results with AI insights and visualizations
+# Usage: Main flow controller that manages all assessment phases
+# Dependencies: All other modules (questions, scoring, AI, visualization)
+
 id: main_assessment_flow
 mandatory: True
 code: |
+  """
+  MAIN ASSESSMENT FLOW CONTROLLER - Day 6 Complete System
+  
+  This is the central orchestrator for the entire assessment system. It manages:
+  1. User information collection and validation
+  2. Pain points prioritization
+  3. Question flow and category feedback
+  4. Score calculation and processing
+  5. AI background processing and result merging
+  6. Results display and document generation
+  
+  Flow Phases:
+  - 'questions': User answers 25 assessment questions (number to be set by csv file)
+  - 'processing': AI generates insights in background
+  - 'results': Display final results with visualizations
+  
+  State Management:
+  - Tracks progress through multiple completion flags
+  - Handles user navigation and auto-advancement
+  - Manages background AI task lifecycle
+  - Ensures data consistency across all phases
+  """
+  
   # MAIN ASSESSMENT FLOW - Day 6 Complete System
   # This runs AFTER user information is collected
   
-  # Ensure level mapping configuration is loaded
+  # =============================================================================
+  # INITIALIZATION AND CONFIGURATION
+  # =============================================================================
+  
+  # Ensure level mapping configuration is loaded for question formatting
   need('formatting_config')
   
   # FIRST: Ensure user information is collected (this will trigger the mandatory user question)
@@ -21,15 +57,24 @@ code: |
 
   # Do not predefine feedback_provided; it must be undefined to trigger the feedback question when needed
 
-  # Unified proceed flag used across flow control
+  # Unified proceed flag used across flow control - checks multiple navigation signals
   any_proceed = (defined('proceeded_to_results') and proceeded_to_results) or \
                 (defined('proceed_to_results') and proceed_to_results)
 
+  # =============================================================================
+  # NAVIGATION SHORT-CIRCUIT HANDLING
+  # =============================================================================
+  # Purpose: Handle user navigation to results, bypassing intermediate steps
+  # Input: Navigation flags from UI (proceeded_to_results, proceed_to_results)
+  # Output: Clean state transition to results phase
+  # Usage: Prevents detours into questions/processing when user wants results
+  
   # HARD SHORT-CIRCUIT: if user has proceeded to results, clear any pending
   # question/feedback state and immediately show results. This prevents detours
   # into category feedback or re-entry into questions/processing.
-  if (defined('proceeded_to_results') and proceeded_to_results) or (defined('proceed_to_results') and proceed_to_results):
+  if (defined('proceeded_to_results') and proceeded_to_results) or (defined('proceeded_to_results') and proceed_to_results):
     try:
+      # Clear any pending category feedback state
       if defined('need_category_feedback'):
         del need_category_feedback
       feedback_provided = True
@@ -38,6 +83,7 @@ code: |
     except Exception:
       pass
     try:
+      # Mark questions as complete to prevent re-entry
       questions_processed = True
       questions_complete = True
       if defined('questions'):
@@ -46,6 +92,7 @@ code: |
         del current_question_response
     except Exception:
       pass
+    # Set phase to results and navigate immediately
     ready_for_processing = False
     processing_started = False
     phase = 'results'
@@ -54,6 +101,7 @@ code: |
   # AUTO-ADVANCE SAFETY: if the UI signaled completion, finalize proceed
   if (defined('ui_progress_done') and ui_progress_done) and not (defined('proceeded_to_results') and proceeded_to_results):
     try:
+      # Auto-advance to results when UI signals completion
       proceeded_to_results = True
       processing_complete = True
       phase = 'results'
@@ -72,6 +120,7 @@ code: |
   if (defined('proceeded_to_results') and proceeded_to_results) or (defined('proceed_to_results') and proceed_to_results):
     if not defined('post_processing_cleanup_done'):
       try:
+        # Clean up processing state to prevent re-entry
         ready_for_processing = False
         processing_started = False
         processing_complete = True
@@ -115,9 +164,19 @@ code: |
       # This should not happen if user_info_collected is True
       user_info_collected = False  # Reset to trigger collection again
   
+  # =============================================================================
+  # ASSESSMENT FLOW INITIALIZATION
+  # =============================================================================
+  # Purpose: Initialize the assessment flow and set up initial state
+  # Input: Navigation flags and user state
+  # Output: Initial phase setting and debug tracking setup
+  # Usage: One-time initialization when assessment flow starts
+  
   if not defined('assessment_flow_started'):
     log("🚀 Starting Day 6 Complete Assessment System...")
     assessment_flow_started = True
+    
+    # Set initial phase based on user state
     if not defined('phase'):
       phase = 'questions'
     # If the user already clicked proceed, lock phase immediately
@@ -125,7 +184,7 @@ code: |
       phase = 'results'
     # Do not reset navigation flags here; they are used to advance to results after processing
     
-    # Initialize debug tracking
+    # Initialize debug tracking for troubleshooting
     if not defined('debug_info'):
       debug_info = []
     
@@ -134,6 +193,14 @@ code: |
       'timestamp': str(today()),
       'data': 'Assessment system started'
     })
+  
+  # =============================================================================
+  # DATA LOADING AND PAIN POINTS COLLECTION
+  # =============================================================================
+  # Purpose: Load all required data and collect user pain point priorities
+  # Input: CSV data files, user pain point selections
+  # Output: Loaded questions, pain points, and offering documents
+  # Usage: Step 1-2 of assessment flow - data preparation and user input
   
   # Step 1: Load questions, pain points, and offering documents
   if not defined('data_loaded'):
@@ -152,6 +219,14 @@ code: |
     # Calculate pain points data immediately after collection
     need('calculate_pain_points_data')
     log("✅ Pain points data calculated")
+  
+  # =============================================================================
+  # QUESTION FLOW MANAGEMENT
+  # =============================================================================
+  # Purpose: Manage the 25-question assessment flow with category feedback
+  # Input: Questions data, user responses, category feedback requirements
+  # Output: Completed questions and readiness for processing phase
+  # Usage: Step 3 of assessment flow - question presentation and feedback collection
   
   # Step 3: Ask all questions but do NOT force feedback from here; let the questions file handle it
   # Skip re-entering the question flow if we are already ready for processing
@@ -182,9 +257,11 @@ code: |
             'overall_score': overall_score if defined('overall_score') else defaults.get('overall_score', 0),
             'industry_average': industry_average if defined('industry_average') else industry_averages.get('default', 2.18),
             'category_averages': category_averages if defined('category_averages') else {},
+            'category_scores': category_scores if defined('category_scores') else (category_averages if defined('category_averages') else {}),
             'pain_points': pain_points if defined('pain_points') else []
           }
           
+          # Launch AI background task for immediate processing
           ai_task = background_action('run_ai_chunks_v2', assessment_data=assessment_data_for_ai)
           ai_background_launched = True
           log("✅ IMMEDIATE: AI background task launched with questions completion")
@@ -209,6 +286,7 @@ code: |
             'overall_score': overall_score if defined('overall_score') else defaults.get('overall_score', 0),
             'industry_average': industry_average if defined('industry_average') else industry_averages.get('default', 2.18),
             'category_averages': category_averages if defined('category_averages') else {},
+            'category_scores': category_scores if defined('category_scores') else (category_averages if defined('category_averages') else {}),
             'pain_points': pain_points if defined('pain_points') else []
           }
           
@@ -220,6 +298,14 @@ code: |
       
       log("✅ Questions completed by index; proceeding to processing")
   
+  # =============================================================================
+  # PROCESSING PHASE INITIATION
+  # =============================================================================
+  # Purpose: Start the processing phase with score calculation and AI background task
+  # Input: Completed questions, user responses, assessment data
+  # Output: Calculated scores, background AI task, processing state
+  # Usage: Step 4 of assessment flow - score calculation and AI processing initiation
+  
   # Step 4: Start processing IMMEDIATELY when ready (all questions + feedback)
   # Background AI should start as soon as processing phase begins
   log(f"🔍 PROCESSING CHECK: phase={phase if defined('phase') else 'undefined'}, ready_for_processing={ready_for_processing if defined('ready_for_processing') else 'undefined'}, any_proceed={any_proceed}")
@@ -229,6 +315,10 @@ code: |
     from docassemble.base.util import background_action
     # FORCE AI background task launch regardless of processing_started state
     log(f"🔍 FORCE CHECK: Will launch AI task. processing_started={processing_started if defined('processing_started') else 'undefined'}")
+    
+    # =============================================================================
+    # PROGRESS LOG INITIALIZATION
+    # =============================================================================
     
     # Initialize progress log and processing state machine
     try:
@@ -240,6 +330,14 @@ code: |
     except Exception:
       pass
     progress_log.append('Initializing processing…')
+    
+    # =============================================================================
+    # SYNCHRONOUS SCORE CALCULATION
+    # =============================================================================
+    # Purpose: Calculate all scores before launching AI background task
+    # Input: User answers, questions data, level mapping
+    # Output: Category averages, overall score, individual scores
+    # Usage: Pre-processing score calculation for immediate availability
     
     # Do all synchronous/lightweight work BEFORE background AI
     try:
@@ -253,6 +351,14 @@ code: |
       
       # Call the score calculation functions directly
       from docassemble.base.util import get_config
+      
+      # =============================================================================
+      # CATEGORY AVERAGES CALCULATION
+      # =============================================================================
+      # Purpose: Calculate category-specific scores from user answers
+      # Input: User answers, questions with categories, level mapping
+      # Output: category_averages dictionary with scores per category
+      # Usage: Provides category-level performance metrics
       
       # Calculate category averages
       log("🔍 FORCE: Calculating category averages...")
@@ -270,19 +376,29 @@ code: |
           # Get category for this question
           category = questions[i-1]['category'] if i <= len(questions) else 'Unknown'
           
+          # Initialize category totals if not exists
           if category not in category_totals:
             category_totals[category] = 0
             category_counts[category] = 0
           
+          # Accumulate scores for category average calculation
           category_totals[category] += level
           category_counts[category] += 1
       
-      # Calculate averages
+      # Calculate final category averages
       for category in category_totals:
         if category_counts[category] > 0:
           category_averages[category] = category_totals[category] / category_counts[category]
       
       log(f"🔍 FORCE: Category averages calculated: {category_averages}")
+      
+      # =============================================================================
+      # OVERALL SCORE AND INDUSTRY AVERAGE CALCULATION
+      # =============================================================================
+      # Purpose: Calculate overall assessment score and set industry benchmark
+      # Input: category_averages, industry_averages configuration
+      # Output: overall_score, industry_average for comparison
+      # Usage: Provides overall performance metric and industry benchmark
       
       # Calculate overall score
       log("🔍 FORCE: Calculating overall score...")
@@ -296,11 +412,20 @@ code: |
       # Set industry average from configuration
       industry_average = industry_averages.get('default', 2.18)
       
+      # =============================================================================
+      # INDIVIDUAL SCORES GENERATION
+      # =============================================================================
+      # Purpose: Generate question-level scores for visualization plots
+      # Input: User answers, questions with industry norms, level mapping
+      # Output: individual_scores list for lollipop plot generation
+      # Usage: Provides data for question-level performance visualization
+      
       # Generate individual scores for plots
       log("🔍 FORCE: Generating individual scores...")
       individual_scores = []
       for i, answer in enumerate(answers, 1):
         if answer and ':' in answer:
+          # Extract user level from answer
           level_letter = answer.split(':')[0].strip()
           level = level_mapping.get(level_letter, 0)
           
@@ -320,7 +445,7 @@ code: |
             'industry_level': industry_level
           })
         else:
-          # Get industry norm score from the question - USE ACTUAL CSV DATA
+          # Handle unanswered questions with fallback values
           industry_level = 2.0  # Fallback only
           if defined('questions') and questions and i-1 < len(questions):
             question = questions[i-1]
@@ -334,6 +459,14 @@ code: |
             'user_level': 0,
             'industry_level': industry_level
           })
+      
+      # =============================================================================
+      # VARIABLE DEFINITION AND VISUALIZATION GENERATION
+      # =============================================================================
+      # Purpose: Define calculated variables and generate visualization plots
+      # Input: Calculated scores, individual scores data
+      # Output: Defined variables, lollipop plot, assessment date
+      # Usage: Makes scores available throughout system and creates visualizations
       
       # Define all the calculated variables
       define('category_averages', category_averages)
@@ -349,6 +482,7 @@ code: |
       log("🔍 FORCE: Generating lollipop plot with calculated scores...")
       need('generate_lollipop_plot_simple')
       
+      # Set assessment completion date
       from datetime import datetime
       define('assessment_date', datetime.now().strftime('%B %d, %Y'))
       progress_log.append('Scores ready.')
@@ -361,6 +495,14 @@ code: |
     except Exception as e:
       log(f"⚠️ Score prep error: {e}")
       progress_log.append(f"Score prep error: {e}")
+    
+    # =============================================================================
+    # AI BACKGROUND TASK LAUNCH
+    # =============================================================================
+    # Purpose: Launch AI background task with calculated assessment data
+    # Input: Calculated scores, pain points, assessment data
+    # Output: Background AI task handle, processing state flags
+    # Usage: Initiates AI processing for insights generation
     
     # Prepare assessment data for background task - ONLY after scores are calculated
     assessment_data_for_ai = {
@@ -385,12 +527,21 @@ code: |
       processing_started = False
     # Processing screen will render next due to show-if on phase
   
+  # =============================================================================
+  # AI BACKGROUND TASK MONITORING AND RESULT MERGING
+  # =============================================================================
+  # Purpose: Monitor AI background task and merge results when complete
+  # Input: ai_task handle, background processing results
+  # Output: Merged AI insights, processing completion flags
+  # Usage: Polls background task and integrates AI-generated content
+  
   # While still on the processing phase, poll the background AI task and merge results when ready
   try:
     if defined('ai_task') and ai_task.ready():
       _ai_result = ai_task.get()
       if isinstance(_ai_result, dict):
         try:
+          # Merge AI-generated insights into session variables
           if 'executive_summary' in _ai_result:
             executive_summary = _ai_result.get('executive_summary')
             define('executive_summary', executive_summary)
@@ -407,6 +558,28 @@ code: |
             recommended_services = _ai_result.get('recommended_services')
             define('recommended_services', recommended_services)
             log(f"✅ MERGED: recommended_services ({len(recommended_services)} chars)")
+          if 'top_three_offerings' in _ai_result:
+            top_three_offerings = _ai_result.get('top_three_offerings')
+            define('top_three_offerings', top_three_offerings)
+            log(f"✅ MERGED: top_three_offerings ({top_three_offerings})")
+          # Compute other_available_offerings now that top_three_offerings is known
+          try:
+            _canonical_offerings = [
+              'Assessment Architecture & Build Package',
+              'Clarity & Visibility Accelerator',
+              'Growth & Loyalty Booster',
+              'Lead Flow Builder',
+              'Maturity Model Design Sprint',
+              'Project Excellence Toolkit',
+              'Proposal & Pitch Package',
+              'Services That Sell Workshop'
+            ]
+            _chosen = set(top_three_offerings) if defined('top_three_offerings') and isinstance(top_three_offerings, list) else set()
+            other_available_offerings = [n for n in _canonical_offerings if n not in _chosen]
+            define('other_available_offerings', other_available_offerings)
+            log(f"✅ Computed other_available_offerings: {other_available_offerings}")
+          except Exception as _e:
+            log(f"⚠️ Failed computing other_available_offerings: {_e}")
           log("✅ SUCCESS: All AI results merged from background task into session")
           # Set AI processing complete flag when all results are successfully merged
           ai_processing_complete = True
@@ -421,9 +594,18 @@ code: |
   except Exception as _bg_err:
     log(f"⚠️ Error checking ai_task readiness: {_bg_err}")
 
+  # =============================================================================
+  # RESULTS PHASE TRANSITION
+  # =============================================================================
+  # Purpose: Transition to results phase when processing is complete
+  # Input: Processing completion flags, user navigation signals
+  # Output: Results phase activation, cleanup of processing state
+  # Usage: Final step - advances to results display when ready
+  
   # Step 4b: If processing has completed in the background, auto-advance to results
   if (defined('processing_complete') and processing_complete) or (defined('proceeded_to_results') and proceeded_to_results) or (defined('proceeded_to_results') and proceed_to_results):
     try:
+      # Set navigation flags and transition to results phase
       proceeded_to_results = True
       proceed_to_results = True
       phase = 'results'

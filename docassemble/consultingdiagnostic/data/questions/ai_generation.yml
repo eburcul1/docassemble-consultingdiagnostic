@@ -129,12 +129,12 @@ code: |
     
     return {
       'api_key': api_key,
-      'model': 'gpt-4o-mini',
+      'model': 'gpt-4.1-mini',
       'max_tokens': 1000,  # Restored to ~1000 tokens
       'temperature': 0.6
     }
   
-  def generate_ai_content_chunk(prompt_key, formatted_data, common_vars):
+  def generate_ai_content_chunk(prompt_key, formatted_data, common_vars, offerings_context=""):
     """Generate AI content for a specific chunk"""
     try:
       log(f"🔄 Making OpenAI API call for {prompt_key}...")
@@ -172,7 +172,7 @@ code: |
           formatted_data=formatted_data,
           role_context="",
           other_insights="",
-          offerings_context="",
+          offerings_context=offerings_context,
           company_name=user_information.get('company', 'this organization') if defined('user_information') and user_information else 'this organization',
           overall_score=overall_score if defined('overall_score') else 'N/A',
           industry_average=industry_average if defined('industry_average') else 'N/A'
@@ -393,7 +393,7 @@ code: |
     
     return {
       'api_key': api_key,
-      'model': 'gpt-4o-mini',
+      'model': 'gpt-4.1-mini',
       'max_tokens': 1000,  # Restored to ~1000 tokens
       'temperature': 0.6
     }
@@ -659,7 +659,7 @@ code: |
     
     return {
       'api_key': api_key,
-      'model': 'gpt-4o-mini',
+      'model': 'gpt-4.1-mini',
       'max_tokens': 1000,  # Restored to ~1000 tokens
       'temperature': 0.6
     }
@@ -923,7 +923,7 @@ code: |
     
     return {
       'api_key': api_key,
-      'model': 'gpt-4o-mini',
+      'model': 'gpt-4.1-mini',
       'max_tokens': 1000,  # Restored to ~1000 tokens
       'temperature': 0.6
     }
@@ -1050,8 +1050,25 @@ code: |
       raise Exception("OpenAI API key not configured")
     log("🔑 API Key found: Yes")
     
+    # Build offerings context for catalog-aware selection
+    def _build_offerings_context():
+      ctx = ""
+      try:
+        if defined('offerings_csv_data') and offerings_csv_data:
+          ctx += "AVAILABLE SERVICE OFFERINGS:\n"
+          for _id, _off in offerings_csv_data.items():
+            _name = _off.get('name') or _off.get('Title') or ''
+            _desc = _off.get('description') or _off.get('Description') or ''
+            if _name:
+              ctx += f"- {_name}: {_desc}\n"
+      except Exception:
+        pass
+      return ctx
+
+    offerings_context = _build_offerings_context()
+
     # Generate recommended services
-    recommended_services = generate_ai_content_chunk('recommended_services', formatted_data, common_vars)
+    recommended_services = generate_ai_content_chunk('recommended_services', formatted_data, common_vars, offerings_context)
     
     # Ensure variable is globally defined
     define('recommended_services', recommended_services)
@@ -1060,5 +1077,386 @@ code: |
   except Exception as e:
     log(f"❌ Recommended services generation failed: {e}")
     recommended_services = "Recommended services generation failed"
+
+---
+# CHUNK 5/5: Top Three Offerings Selection
+id: generate_top_three_offerings
+variable: top_three_offerings
+code: |
+  from docassemble.base.util import log, get_config, define
+  import os
+  import json
+  import time
+  from docassemble.base.util import path_and_mimetype
+  
+  log("📋 CHUNK 5/5: Top Three Offerings Selection - Starting...")
+  log("🔍 DEBUG: This chunk is being executed!")
+  
+  def load_ai_prompts():
+    """Load AI prompts from JSON file"""
+    try:
+      log("📁 Loading AI prompts from file...")
+      
+      # Try multiple possible locations for the file
+      from docassemble.base.util import path_and_mimetype
+      
+      possible_paths = []
+      
+      # Try Docassemble static file path first
+      try:
+        da_path = path_and_mimetype('ai_prompts.json')[0]
+        if da_path:
+          possible_paths.append(da_path)
+      except:
+        pass
+      
+      # Add fallback paths
+      possible_paths.extend([
+        'ai_prompts.json',  # Current directory
+        os.path.join(os.getcwd(), 'ai_prompts.json')  # Absolute path
+      ])
+      
+      file_path = None
+      for path in possible_paths:
+        log(f"🔍 Trying path: {path}")
+        if os.path.exists(path):
+          file_path = path
+          log(f"✅ Found file at: {path}")
+          break
+      
+      if not file_path:
+        raise Exception(f"ai_prompts.json not found in any of the expected locations: {possible_paths}")
+      
+      with open(file_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+      
+      if not config.get('prompts'):
+        raise ValueError("No prompts found in configuration")
+      
+      log(f"✅ AI prompts loaded from: {file_path}")
+      return config
+      
+    except Exception as e:
+      log(f"❌ Failed to load AI prompts: {e}")
+      raise Exception(f"Critical: Cannot load AI prompts configuration: {e}")
+  
+  def build_formatted_data():
+    """Build comprehensive formatted data for AI processing"""
+    log("📊 Building comprehensive formatted data for AI...")
+    
+    formatted_data = "=== PARTICIPANT INFORMATION ===\n"
+    
+    # Add user information
+    if defined('user_information') and user_information:
+      formatted_data += f"Company: {user_information.get('company', 'Not provided')}\n"
+      formatted_data += f"Industry: {user_information.get('industry', 'Not provided')}\n"
+      formatted_data += f"Role: {user_information.get('role', 'Not provided')}\n"
+    
+    formatted_data += "\n=== SCORING DATA ===\n"
+    
+    # Add overall score
+    if defined('overall_score'):
+      formatted_data += f"Overall Score: {overall_score}/4\n"
+    
+    # Add industry average
+    if defined('industry_average'):
+      formatted_data += f"Industry Average: {industry_average}/4\n"
+    
+    # Add category scores
+    if defined('category_scores') and category_scores:
+      formatted_data += "Category Scores:\n"
+      for category, score in category_scores.items():
+        formatted_data += f"  {category}: {score}/4\n"
+    
+    log(f"✅ Formatted data built: {len(formatted_data)} characters")
+    return formatted_data
+  
+  def build_offerings_context():
+    """Build offerings catalog context for AI"""
+    log("📊 Building offerings context for AI...")
+    
+    offerings_context = ""
+    
+    # Load offerings data
+    if defined('offerings_csv_data') and offerings_csv_data:
+      offerings_context += "AVAILABLE SERVICE OFFERINGS:\n"
+      for offering_id, offering_data in offerings_csv_data.items():
+        name = offering_data.get('name', offering_id)
+        description = offering_data.get('description', 'No description available')
+        offerings_context += f"- {name}: {description}\n"
+    else:
+      # Fallback to hardcoded list if CSV not loaded
+      offerings_context = (
+        "AVAILABLE SERVICE OFFERINGS:\n"
+        "- Assessment Architecture & Build Package: Comprehensive assessment system design and implementation\n"
+        "- Clarity & Visibility Accelerator: Strategic positioning and market clarity enhancement\n"
+        "- Growth & Loyalty Booster: Customer retention and growth strategy development\n"
+        "- Lead Flow Builder: Lead generation and conversion optimization\n"
+        "- Maturity Model Design Sprint: Custom maturity framework development\n"
+        "- Project Excellence Toolkit: Project management and delivery optimization\n"
+        "- Proposal & Pitch Package: Sales proposal and presentation enhancement\n"
+        "- Services That Sell Workshop: Service offering and pricing strategy workshop"
+      )
+    
+    log(f"✅ Offerings context built: {len(offerings_context)} characters")
+    return offerings_context
+  
+  def build_pain_points_context():
+    """Build pain points context for AI"""
+    log("📊 Building pain points context for AI...")
+    
+    pain_points_context = ""
+    
+    if defined('user_selected_challenges') and user_selected_challenges:
+      pain_points_context += "TOP 3 PRIORITIZED CHALLENGES:\n"
+      count = 0
+      for challenge_id, is_selected in user_selected_challenges.items():
+        if is_selected and challenge_id != 'none_above' and count < 3:
+          # Get pain point details from CSV data
+          if defined('pain_points_csv_data') and pain_points_csv_data and challenge_id in pain_points_csv_data:
+            pain_point = pain_points_csv_data[challenge_id]
+            title = pain_point.get('title', challenge_id)
+            description = pain_point.get('description', 'No description available')
+            pain_points_context += f"{count + 1}. {title}: {description}\n"
+          else:
+            pain_points_context += f"{count + 1}. {challenge_id}\n"
+          count += 1
+    else:
+      pain_points_context = "No prioritized challenges identified"
+    
+    log(f"✅ Pain points context built: {len(pain_points_context)} characters")
+    return pain_points_context
+  
+  def build_lowest_categories_context():
+    """Build lowest-scoring categories context for AI"""
+    log("📊 Building lowest categories context for AI...")
+    
+    lowest_categories_context = ""
+    
+    if defined('category_scores') and category_scores:
+      # Sort categories by score (lowest first)
+      sorted_categories = sorted(category_scores.items(), key=lambda x: x[1])
+      
+      lowest_categories_context += "LOWEST-SCORING CATEGORIES (biggest improvement opportunities):\n"
+      for i, (category, score) in enumerate(sorted_categories[:3]):  # Top 3 lowest
+        gap = 4.0 - score  # Calculate improvement gap
+        lowest_categories_context += f"{i + 1}. {category}: {score:.1f}/4.0 (gap: {gap:.1f})\n"
+    else:
+      lowest_categories_context = "No category scores available"
+    
+    log(f"✅ Lowest categories context built: {len(lowest_categories_context)} characters")
+    return lowest_categories_context
+  
+  def get_common_variables():
+    """Get common variables for AI processing"""
+    # Get API key with robust detection
+    api_key = get_config('openai api key')
+    if not api_key:
+      openai_config = get_config('openai')
+      if openai_config and isinstance(openai_config, dict):
+        api_key = openai_config.get('api_key')
+    if not api_key:
+      api_key = os.getenv('OPENAI_API_KEY')
+    
+    return {
+      'api_key': api_key,
+      'model': 'gpt-4.1-mini',
+      'max_tokens': 200,  # Small response for JSON array
+      'temperature': 0.3  # Low temperature for consistent selection
+    }
+  
+  def generate_ai_content_chunk(prompt_key, formatted_data, common_vars, offerings_context, pain_points_context, lowest_categories_context):
+    """Generate AI content for a specific chunk"""
+    try:
+      log(f"🔄 Making OpenAI API call for {prompt_key}...")
+      
+      import openai
+      import httpx
+      
+      # Create OpenAI client with comprehensive timeout configuration
+      client = openai.OpenAI(
+        api_key=common_vars['api_key'],
+        timeout=httpx.Timeout(
+          connect=10.0,    # Connection timeout
+          write=60.0,      # Write timeout  
+          read=60.0,       # Read timeout
+          pool=30.0        # Pool timeout
+        ),
+        max_retries=3      # Built-in retry mechanism
+      )
+      log("✅ OpenAI client created with comprehensive timeout config")
+      
+      # Get prompt from configuration
+      config = load_ai_prompts()
+      prompt_config = config['prompts'].get(prompt_key)
+      if not prompt_config:
+        raise ValueError(f"Prompt '{prompt_key}' not found in configuration")
+      
+      # Extract system and user prompts
+      system_prompt = prompt_config.get('system', '')
+      user_prompt = prompt_config.get('user_template', '')
+      
+      # Format user prompt with available data
+      try:
+        formatted_user_prompt = user_prompt.format(
+          formatted_data=formatted_data,
+          offerings_context=offerings_context,
+          pain_points_context=pain_points_context,
+          lowest_categories_context=lowest_categories_context,
+          company_name=user_information.get('company', 'this organization') if defined('user_information') and user_information else 'this organization',
+          overall_score=overall_score if defined('overall_score') else 'N/A',
+          industry_average=industry_average if defined('industry_average') else 'N/A'
+        )
+      except KeyError as e:
+        log(f"⚠️ Warning: Missing template variable {e}, using raw prompt")
+        formatted_user_prompt = user_prompt
+      
+      # Prepare messages
+      messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": formatted_user_prompt}
+      ]
+      
+      log(f"📝 Model: {common_vars['model']}")
+      log(f"📝 Max tokens: {common_vars['max_tokens']}")
+      log(f"📝 Temperature: {common_vars['temperature']}")
+      
+      # Try streaming first (faster, prevents timeouts)
+      try:
+        log(f"🔄 Attempting streaming for {prompt_key}...")
+        stream_response = client.chat.completions.create(
+          model=common_vars['model'],
+          messages=messages,
+          max_tokens=common_vars['max_tokens'],
+          temperature=common_vars['temperature'],
+          stream=True
+        )
+        
+        # Collect streaming response
+        content_parts = []
+        for chunk in stream_response:
+          if chunk.choices[0].delta.content:
+            content_parts.append(chunk.choices[0].delta.content)
+        
+        content = ''.join(content_parts).strip()
+        log(f"✅ Streaming completed successfully: {len(content)} chars")
+        return content
+        
+      except Exception as stream_error:
+        log(f"⚠️ Streaming failed: {stream_error}, trying non-streaming...")
+        
+        # Fallback to non-streaming with retry logic
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+          try:
+            log(f"🔄 Non-streaming attempt {attempt + 1}/{max_retries + 1} for {prompt_key}")
+            
+            response = client.chat.completions.create(
+              model=common_vars['model'],
+              messages=messages,
+              max_tokens=common_vars['max_tokens'],
+              temperature=common_vars['temperature']
+            )
+            
+            content = response.choices[0].message.content.strip()
+            log(f"✅ Non-streaming API call completed successfully")
+            log(f"✅ {prompt_key}: {len(content)} chars")
+            return content
+            
+          except Exception as e:
+            if attempt < max_retries:
+              log(f"⚠️ Attempt {attempt + 1} failed: {e}")
+              time.sleep(3)  # Longer wait between retries
+              continue
+            else:
+              raise e  # Re-raise if no more retries
+      
+    except Exception as e:
+      log(f"❌ AI generation failed for {prompt_key}: {e}")
+      return f"{prompt_key.replace('_', ' ').title()} generation failed"
+  
+  # Main execution
+  try:
+    # Load prompts and prepare data
+    common_vars = get_common_variables()
+    formatted_data = build_formatted_data()
+    offerings_context = build_offerings_context()
+    pain_points_context = build_pain_points_context()
+    lowest_categories_context = build_lowest_categories_context()
+    
+    # Check API key
+    if not common_vars['api_key']:
+      raise Exception("OpenAI API key not configured")
+    log("🔑 API Key found: Yes")
+    
+    # Generate top three offerings selection
+    top_three_response = generate_ai_content_chunk('top_three_offerings', formatted_data, common_vars, offerings_context, pain_points_context, lowest_categories_context)
+    
+    # Parse JSON response
+    try:
+      top_three_offerings = json.loads(top_three_response)
+      if isinstance(top_three_offerings, list) and len(top_three_offerings) == 3:
+        log(f"✅ Successfully parsed top 3 offerings: {top_three_offerings}")
+      else:
+        log(f"⚠️ Invalid response format, using fallback")
+        top_three_offerings = ["Assessment Architecture & Build Package", "Clarity & Visibility Accelerator", "Growth & Loyalty Booster"]
+    except json.JSONDecodeError as e:
+      log(f"❌ Failed to parse JSON response: {e}")
+      log(f"❌ Raw response: {top_three_response}")
+      top_three_offerings = ["Assessment Architecture & Build Package", "Clarity & Visibility Accelerator", "Growth & Loyalty Booster"]
+    
+    # Ensure variable is globally defined
+    define('top_three_offerings', top_three_offerings)
+    log("✅ CHUNK 5/5: Top Three Offerings Selected Successfully!")
+
+    # Immediately regenerate the recommended services narrative to STRICTLY justify the selected top three
+    try:
+      config_all = load_ai_prompts()
+      rec_cfg = config_all['prompts'].get('recommended_services')
+      if rec_cfg:
+        # Build exact-order lines to inject into the prompt
+        try:
+          top_three_offerings_lines = "".join([f"{i+1}) {name}\n" for i, name in enumerate(top_three_offerings)])
+        except Exception:
+          top_three_offerings_lines = ""\
+            "1) " + (top_three_offerings[0] if len(top_three_offerings) > 0 else "") + "\n" + \
+            "2) " + (top_three_offerings[1] if len(top_three_offerings) > 1 else "") + "\n" + \
+            "3) " + (top_three_offerings[2] if len(top_three_offerings) > 2 else "") + "\n"
+
+        # Compose user prompt with strict names and order
+        try:
+          rec_prompt = rec_cfg['user_template'].format(
+            formatted_data=formatted_data,
+            top_three_offerings_lines=top_three_offerings_lines,
+            lowest_categories_context=lowest_categories_context,
+            pain_points_context=pain_points_context
+          )
+        except KeyError as e:
+          log(f"⚠️ Warning: Missing template variable {e} in recommended_services, using fallback")
+          rec_prompt = rec_cfg['user_template']
+
+        from openai import OpenAI
+        rec_client = OpenAI(api_key=common_vars['api_key'])
+        rec_response = rec_client.chat.completions.create(
+          model=rec_cfg.get('model', 'gpt-4.1-mini'),
+          messages=[
+            {"role": "system", "content": rec_cfg.get('system', '')},
+            {"role": "user", "content": rec_prompt}
+          ],
+          max_tokens=rec_cfg.get('max_tokens', 900),
+          temperature=rec_cfg.get('temperature', 0.3)
+        )
+        recommended_services = rec_response.choices[0].message.content.strip()
+        define('recommended_services', recommended_services)
+        log("✅ Regenerated recommended_services strictly from selected top_three_offerings")
+      else:
+        log("⚠️ No recommended_services prompt found when regenerating narrative")
+    except Exception as _re:
+      log(f"⚠️ Failed to regenerate recommended_services narrative: {_re}")
+    
+  except Exception as e:
+    log(f"❌ Top three offerings selection failed: {e}")
+    top_three_offerings = ["Assessment Architecture & Build Package", "Clarity & Visibility Accelerator", "Growth & Loyalty Booster"]
+    define('top_three_offerings', top_three_offerings)
 
 ---

@@ -2,7 +2,7 @@
 metadata:
   title: Consulting Services Diagnostic
   short title: 
-  version: "0.0.4"
+  version: "0.0.6"
   description: |
     Complete diagnostic system for consulting services.
     
@@ -129,6 +129,8 @@ allow:
   - status_json
   - run_ai_chunks
   - go_results
+  - send_email
+  - test_email
 
 ---
 # =============================================================================
@@ -395,7 +397,7 @@ code: |
 # Usage: Template variables for document generation and personalization
 
 id: welcome_assessment
-mandatory: True
+mandatory: False
 question: |
   **Let's get started with some basic information about you and your organization.**
   
@@ -539,7 +541,7 @@ code: |
     log("SUCCESS: All critical variables ready")
   
   # Check AI variables
-  ai_variables = ['executive_summary', 'contradictions_insights', 'challenge_questions', 'recommended_services']
+  ai_variables = ['executive_summary', 'contradictions_insights', 'challenge_questions', 'recommended_services', 'top_three_offerings']
   missing_ai_vars = [var for var in ai_variables if not defined(var)]
   
   if missing_ai_vars:
@@ -623,11 +625,12 @@ code: |
     defined('executive_summary') and executive_summary and executive_summary != "Executive summary generation failed" and
     defined('contradictions_insights') and contradictions_insights and contradictions_insights != "Strategic insights generation failed" and
     defined('challenge_questions') and challenge_questions and challenge_questions != "Challenge questions generation failed" and
-    defined('recommended_services') and recommended_services and recommended_services != "Recommended services generation failed"
+    defined('recommended_services') and recommended_services and recommended_services != "Recommended services generation failed" and
+    defined('top_three_offerings') and top_three_offerings and isinstance(top_three_offerings, list) and len(top_three_offerings) == 3
   )
   
   # Debug: Log the status of each AI variable
-  log(f"🔍 STATUS CHECK: executive_summary={defined('executive_summary')}, contradictions_insights={defined('contradictions_insights')}, challenge_questions={defined('challenge_questions')}, recommended_services={defined('recommended_services')}")
+  log(f"🔍 STATUS CHECK: executive_summary={defined('executive_summary')}, contradictions_insights={defined('contradictions_insights')}, challenge_questions={defined('challenge_questions')}, recommended_services={defined('recommended_services')}, top_three_offerings={defined('top_three_offerings')}")
   log(f"🔍 AI COMPLETE: {ai_complete}")
   
   complete = (defined('processing_complete') and processing_complete) or ai_complete
@@ -639,6 +642,51 @@ code: |
     'started': started,
     'ai_complete': ai_complete
   }), content_type='application/json')
+
+---
+event: send_email
+code: |
+  """
+  EMAIL SENDING API ENDPOINT
+  
+  This endpoint handles email sending requests from the frontend.
+  It processes the send_document_email action and returns JSON response.
+  """
+  
+  import json
+  
+  try:
+    # Get the action from the request
+    action = request.json.get('action', '') if hasattr(request, 'json') and request.json else ''
+    
+    if action == 'send_document_email':
+      # Trigger the email sending function
+      need('send_document_email')
+      
+      # Return response based on email result
+      if defined('email_sent') and email_sent:
+        response(json.dumps({
+          'success': True,
+          'message': 'Email sent successfully'
+        }), content_type='application/json')
+      else:
+        error_msg = email_error if defined('email_error') and email_error else 'Unknown error'
+        response(json.dumps({
+          'success': False,
+          'error': error_msg
+        }), content_type='application/json')
+    else:
+      response(json.dumps({
+        'success': False,
+        'error': 'Invalid action'
+      }), content_type='application/json')
+      
+  except Exception as e:
+    log(f"❌ Email API error: {e}")
+    response(json.dumps({
+      'success': False,
+      'error': f'Server error: {str(e)}'
+    }), content_type='application/json')
   
 ---
 # CALCULATE INDIVIDUAL SCORES
@@ -739,6 +787,101 @@ code: |
   
   log(f"📄 Document template variables set: executive_summary={len(executive_summary)} chars, contradictions_insights={len(contradictions_insights)} chars, ai_content_ready={ai_content_ready}")
 
+  # Build list of other available services as canonical minus top_three_offerings
+  try:
+    _canonical_offerings = [
+      'Assessment Architecture & Build Package',
+      'Clarity & Visibility Accelerator',
+      'Growth & Loyalty Booster',
+      'Lead Flow Builder',
+      'Maturity Model Design Sprint',
+      'Project Excellence Toolkit',
+      'Proposal & Pitch Package',
+      'Services That Sell Workshop'
+    ]
+    _chosen = set(top_three_offerings) if defined('top_three_offerings') and isinstance(top_three_offerings, list) else set()
+    other_available_offerings = [name for name in _canonical_offerings if name not in _chosen][:5]
+    define('other_available_offerings', other_available_offerings)
+    log(f"📄 other_available_offerings set to: {other_available_offerings}")
+    
+    # TESTING OUTPUT: Display top 3 and other services for verification
+    log("=" * 60)
+    log("🎯 TESTING: TOP 3 RECOMMENDED SERVICES")
+    log("=" * 60)
+    if defined('top_three_offerings') and top_three_offerings:
+      for i, offering in enumerate(top_three_offerings, 1):
+        log(f"  {i}. {offering}")
+    else:
+      log("  ❌ No top 3 offerings available")
+    
+    log("")
+    log("📋 TESTING: OTHER AVAILABLE SERVICES")
+    log("=" * 60)
+    if other_available_offerings:
+      for i, offering in enumerate(other_available_offerings, 1):
+        log(f"  {i}. {offering}")
+    else:
+      log("  ❌ No other services available")
+    log("=" * 60)
+    
+    # Additional debugging for template variables
+    log("🔍 TEMPLATE VARIABLES DEBUG:")
+    log(f"  - top_three_offerings defined: {defined('top_three_offerings')}")
+    log(f"  - offering_document_files_list defined: {defined('offering_document_files_list')}")
+    if defined('offering_document_files_list'):
+      log(f"  - offering_document_files_list length: {len(offering_document_files_list)}")
+      for i, doc in enumerate(offering_document_files_list[:3]):  # Show first 3
+        log(f"    {i+1}. {doc.name} -> {doc.template_path}")
+
+    # Reorder offering_document_files_list so first three match top_three_offerings strictly
+    try:
+      if defined('offering_document_files_list') and offering_document_files_list and defined('top_three_offerings') and isinstance(top_three_offerings, list):
+        def _norm(s):
+          try:
+            return (s or '').lower().replace('&','and').replace('—','-').replace('–','-').replace('  ',' ').strip()
+          except Exception:
+            return ''
+        name_to_doc = {}
+        for _doc in offering_document_files_list:
+          _doc_name = _doc.name if hasattr(_doc, 'name') else None
+          _doc_filename = _doc.filename if hasattr(_doc, 'filename') else None
+          _doc_tpl = _doc.template_path if hasattr(_doc, 'template_path') else None
+          _key = _norm(_doc_name or _doc_filename or _doc_tpl)
+          if _key and _key not in name_to_doc:
+            name_to_doc[_key] = _doc
+        selected_docs = []
+        selected_paths = set()
+        for off in top_three_offerings:
+          _k = _norm(off)
+          _d = name_to_doc.get(_k)
+          if _d and getattr(_d, 'template_path', None) not in selected_paths:
+            selected_docs.append(_d)
+            selected_paths.add(_d.template_path)
+        others = [_d for _d in offering_document_files_list if getattr(_d, 'template_path', None) not in selected_paths]
+        offering_document_files_list = selected_docs + others
+        define('offering_document_files_list', offering_document_files_list)
+        log("✅ Reordered offering_document_files_list to match top_three_offerings order")
+        for i, _d in enumerate(offering_document_files_list[:5]):
+          log(f"    ORDER {i+1}: {_d.name} -> {_d.template_path}")
+
+        # Build explicit ordered template paths for top three to be used directly by DOCX
+        try:
+          top_three_template_paths = []
+          if defined('offering_name_to_template_path'):
+            for _off in top_three_offerings:
+              _tpl = offering_name_to_template_path.get(_off)
+              if _tpl:
+                top_three_template_paths.append(_tpl)
+          define('top_three_template_paths', top_three_template_paths)
+          log(f"✅ Built top_three_template_paths: {top_three_template_paths}")
+        except Exception as _map_err:
+          log(f"⚠️ Failed to build top_three_template_paths: {_map_err}")
+    except Exception as _order_err:
+      log(f"⚠️ Failed to reorder offering_document_files_list: {_order_err}")
+    
+  except Exception as _e:
+    log(f"⚠️ Failed to set other_available_offerings: {_e}")
+
 ---
 # =============================================================================
 # ASSESSMENT RESULTS DISPLAY
@@ -758,7 +901,32 @@ logo: |
 
 subquestion: |
   Your personalized diagnostic report has been generated and is ready for download below.
+
   
+  ---
+  
+  TESTING OUTPUT
+  ==============
+  
+  Top 3 Recommended Services
+  --------------------------
+  % if defined('top_three_offerings') and top_three_offerings:
+  %   for i, off in enumerate(top_three_offerings, 1):
+    ${ i }. ${ off }
+  %   endfor
+  % else:
+    No top three offerings available.
+  % endif
+  
+  Other Available Services
+  ------------------------
+  % if defined('other_available_offerings') and other_available_offerings:
+  %   for i, off in enumerate(other_available_offerings, 1):
+    ${ i }. ${ off }
+  %   endfor
+  % else:
+    No other services available.
+  % endif
 
 
 attachments:
@@ -800,6 +968,7 @@ attachments:
       category_scores: ${category_scores if defined('category_scores') else {}}
       assessment_date: ${assessment_date if defined('assessment_date') else 'N/A'}
       offering_document_files_list: ${offering_document_files_list if defined('offering_document_files_list') else []}
+      top_three_offerings: ${top_three_offerings if defined('top_three_offerings') else []}
       merged_offering_content: ${merged_offering_content if defined('merged_offering_content') else 'No offering documents available'}
       # Pain Points Data
       selected_pain_points_count: ${selected_pain_points_count if defined('selected_pain_points_count') else 0}
@@ -1023,6 +1192,55 @@ under: |
         console.log('Simple favicon error:', e);
       }
     }, 100);
+    
+    // Email functionality
+    window.sendEmailReport = function() {
+      console.log('sendEmailReport function called');
+      var statusDiv = document.getElementById('email-status');
+      if (statusDiv) {
+        statusDiv.innerHTML = '<div class="alert alert-info">📧 Sending email... Please wait.</div>';
+      }
+      console.log('Making email request...');
+      
+      // Make AJAX call to send email
+      fetch('/interview?i=docassemble.playground1Sept9AgenticImprovements:main_interview.yml&event=send_email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'send_document_email'
+        })
+      })
+      .then(response => {
+        console.log('Email response status:', response.status);
+        return response.json();
+      })
+      .then(data => {
+        console.log('Email response data:', data);
+        if (statusDiv) {
+          if (data.success) {
+            statusDiv.innerHTML = '<div class="alert alert-success">✅ Email sent successfully! Check your inbox.</div>';
+          } else {
+            statusDiv.innerHTML = '<div class="alert alert-danger">❌ Email failed: ' + (data.error || 'Unknown error') + '</div>';
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Email error:', error);
+        if (statusDiv) {
+          statusDiv.innerHTML = '<div class="alert alert-danger">❌ Email error: ' + error.message + '</div>';
+        }
+      });
+    };
+    
+    window.downloadReport = function() {
+      // Hide email options and show download
+      var emailCard = document.querySelector('.assessment-card');
+      if (emailCard) {
+        emailCard.style.display = 'none';
+      }
+    };
   })();
   </script>
 

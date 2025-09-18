@@ -1,21 +1,79 @@
 ---
-# Document Content Loader - Create objects for template iteration
-# Documents are already in template directory, just need to create objects
+# =============================================================================
+# DOCUMENT GENERATOR - TEMPLATE DOCUMENT OBJECT CREATION
+# =============================================================================
+# Purpose: Create document objects for template iteration and document generation
+# Input: Pre-existing DOCX template files in template directory
+# Output: Structured document objects for Jinja2 template processing
+# Usage: Provides document objects for assessment report generation and proposal inserts
+# Dependencies: DOCX template files must exist in template directory
 
 ---
+# =============================================================================
+# OFFERING DOCUMENT CONTENT LOADER
+# =============================================================================
+# Purpose: Create document objects for template iteration and document generation
+# Input: Pre-existing DOCX template files in template directory
+# Output: Structured document objects for Jinja2 template processing
+# Usage: Provides document objects for assessment report generation and proposal inserts
+# Dependencies: DOCX template files must exist in template directory
+
 initial: True
 id: load_offering_document_content
 code: |
+  """
+  OFFERING DOCUMENT CONTENT LOADER
+  
+  This block creates document objects for template iteration and document generation.
+  It processes pre-existing DOCX template files (ie the offering proposal inserts) and creates structured objects
+  that can be used in Jinja2 templates for dynamic document generation.
+  
+  Document Processing:
+  - Loads 8 predefined DOCX template files for service offerings
+  - Creates DAObject instances for each template file
+  - Generates human-readable names from filenames
+  - Provides both dictionary and list access for template flexibility
+  - Defines variables globally for Jinja2 template access
+  - Supports dynamic filtering based on top_three_offerings selection
+  
+  Demo Template Files:
+  - Assessment Architecture and Build Proposal Insert
+  - Clarity and Visibility Accelerator Proposal Insert
+  - Growth and Loyalty Booster Proposal Insert
+  - Lead Flow Builder Proposal Insert
+  - Maturity Model Design Sprint Proposal Insert
+  - Project Excellence Toolkit Proposal Insert
+  - Proposal and Pitch Package Proposal Insert
+  - Services That Sell Workshop Proposal Insert
+  
+  Object Structure:
+  - name: Human-readable name (e.g., "Assessment Architecture and Build")
+  - template_path: Filename for include_docx_template function
+  - filename: Original filename for reference
+  
+  Template Integration:
+  - Objects can be iterated in Jinja2 templates
+  - Supports both dictionary and list access patterns
+  - Enables dynamic document inclusion in assessment reports
+  
+  Error Handling:
+  - Graceful degradation if template files are missing
+  - Comprehensive logging for troubleshooting
+  - Fallback to empty structures if loading fails
+  """
+  
   # Create document objects for template iteration - documents are already in template directory
   if not defined('offering_document_content_loaded'):
     from docassemble.base.util import DAObject
     
     # Initialize both dictionary and list for template compatibility
+    # Dictionary provides key-based access, list provides iteration capability
     offering_document_files = {}
     offering_document_files_list = []
     
     try:
       # List of expected DOCX files that are already in the template directory
+      # These files contain proposal inserts for different service offerings
       expected_files = [
         "Assessment_Architecture_and_Build_Proposal_Insert.docx",
         "Clarity_and_Visibility_Accelerator_Proposal_Insert.docx", 
@@ -27,31 +85,77 @@ code: |
         "Services_That_Sell_Workshop_Proposal_Insert.docx"
       ]
       
+      # Map filenames to canonical offering names used by AI output
+      filename_to_offering_name = {
+        "Assessment_Architecture_and_Build_Proposal_Insert.docx": "Assessment Architecture & Build Package",
+        "Clarity_and_Visibility_Accelerator_Proposal_Insert.docx": "Clarity & Visibility Accelerator",
+        "Growth_and_Loyalty_Booster_Proposal_Insert.docx": "Growth & Loyalty Booster",
+        "Lead_Flow_Builder_Proposal_Insert.docx": "Lead Flow Builder",
+        "Maturity_Model_Design_Sprint_Proposal_Insert.docx": "Maturity Model Design Sprint",
+        "Project_Excellence_Toolkit_Proposal_Insert.docx": "Project Excellence Toolkit",
+        "Proposal_and_Pitch_Package_Proposal_Insert.docx": "Proposal & Pitch Package",
+        "Services_That_Sell_Workshop_Proposal_Insert.docx": "Services That Sell Workshop"
+      }
+
+      # Process each expected template file
       for filename in expected_files:
-        # Create object for template iteration (what your Jinja2 template expects)
+        # Create DAObject for template iteration (what your Jinja2 template expects)
         doc_obj = DAObject()
-        doc_obj.name = filename.replace('_Proposal_Insert.docx', '').replace('_', ' ')
-        doc_obj.template_path = filename  # Just filename for include_docx_template
+        
+        # Set canonical name to match AI-selected offering names exactly
+        doc_obj.name = filename_to_offering_name.get(
+          filename,
+          filename.replace('_Proposal_Insert.docx', '').replace('_', ' ')
+        )
+        # Use just the filename; files are located in the package's template directory
+        doc_obj.template_path = filename
         doc_obj.filename = filename
         
         # Store in both dictionary and list for template compatibility
+        # Dictionary allows key-based access, list allows iteration in templates
         offering_document_files[filename] = doc_obj
         offering_document_files_list.append(doc_obj)
+      
+      # Build a reverse lookup: exact offering name -> template_path
+      offering_name_to_template_path = {}
+      for _doc in offering_document_files_list:
+        try:
+          _name_key = (_doc.name or '').strip()
+          if _name_key and _name_key not in offering_name_to_template_path:
+            offering_name_to_template_path[_name_key] = _doc.template_path
+        except Exception:
+          pass
         
         log(f"✅ Created document object: {doc_obj.name} -> {filename}")
       
       log(f"📄 Document loading complete. Created {len(offering_document_files_list)} objects for template iteration")
       
       # Debug: Log the actual objects for troubleshooting
+      # This helps verify that objects are created correctly with proper attributes
       for i, doc_obj in enumerate(offering_document_files_list):
         log(f"📄 Document {i+1}: name='{doc_obj.name}', template_path='{doc_obj.template_path}', filename='{doc_obj.filename}'")
       
+      # Define variables globally for template access
+      define('offering_document_files', offering_document_files)
+      define('offering_document_files_list', offering_document_files_list)
+      
+      # Define variables globally for template access
+      define('offering_name_to_template_path', offering_name_to_template_path)
+      
+      # Mark as loaded to prevent duplicate processing
       offering_document_content_loaded = True
       document_loader_complete = True
       
     except Exception as e:
       log(f"❌ Critical error in document loading: {str(e)}")
+      # Set empty structures if loading fails - graceful degradation
       offering_document_files = {}
       offering_document_files_list = []
+      offering_name_to_template_path = {}
+      # Define empty variables globally even on error
+      define('offering_name_to_template_path', offering_name_to_template_path)
+      # Define empty variables globally even on error
+      define('offering_document_files', offering_document_files)
+      define('offering_document_files_list', offering_document_files_list)
       offering_document_content_loaded = False 
       document_loader_complete = False 

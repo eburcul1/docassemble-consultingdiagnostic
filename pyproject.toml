@@ -1,24 +1,24 @@
 [build-system]
 requires = [
-    "setuptools>=80.9.0",
+    "setuptools==80.9.0",
 ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "docassemble.consultingdiagnostic"
-version = "0.0.4"
+version = "0.0.6"
 description = "AI enabled help for each category, new prioritization screen for pain points."
 readme = "README.md"
 authors = [
     { name = "System Administrator", email = "burcul_elvis@hotmail.com" },
 ]
 dependencies = [
-    "matplotlib>=3.10.5",
+    "matplotlib>=3.10.6",
     "openai>=1.86.0",
 ]
 
 [project.urls]
-Homepage = "https://docassemble.org"
+Homepage = "https://github.com/eburcul1/docassemble-consultingdiagnostic.git"
 
 [tool.setuptools.packages.find]
 where = [
