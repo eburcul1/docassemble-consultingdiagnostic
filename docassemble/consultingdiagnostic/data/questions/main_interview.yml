@@ -2,7 +2,7 @@
 metadata:
   title: Consulting Services Diagnostic
   short title: 
-  version: "0.0.7"
+  version: "0.0.8"
   description: |
     Complete diagnostic system for consulting services.
     
@@ -81,7 +81,7 @@ metadata:
     - State recovery for interrupted sessions
     
     Author: Veloquent Consulting
-    Last Updated: January 2025
+    Last Updated: October 8 2025
     License: Proprietary - Veloquent Consulting
   required privileges:
     - admin
@@ -95,12 +95,12 @@ metadata:
     - document-generation
   exit link: off
   logo: |
-    <img src="/packagestatic/docassemble.playground1Aug25Optimization/logo.png" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">
+    <img src="/packagestatic/docassemble.playground1Sep19/logo.png" alt="Logo" class="brand-logo" style="height:50px; vertical-align:middle;">
   
   head: |
-    <link rel="icon" type="image/png" href="packagestatic/docassemble.playground1Aug25Optimization/logo.png">
-    <link rel="shortcut icon" type="image/png" href="packagestatic/docassemble.playground1Aug25Optimization/logo.png">
-    <link rel="apple-touch-icon" type="image/png" href="packagestatic/docassemble.playground1Aug25Optimization/logo.png">
+    <link rel="icon" type="image/png" href="packagestatic/docassemble.playground1Sep19/logo.png">
+    <link rel="shortcut icon" type="image/png" href="packagestatic/docassemble.playground1Sep19/logo.png">
+    <link rel="apple-touch-icon" type="image/png" href="packagestatic/docassemble.playground1Sep19/logo.png">
   
   footer: |
     <div class="ve-footer">
@@ -225,6 +225,11 @@ code: |
   need('scoring_config')
   need('ui_config')
   need('ai_config')
+  # Ensure intelligence agent config is loaded so use_intelligence_agent is defined
+  try:
+    need('intelligence_agent_config')
+  except Exception as _iac_err:
+    log(f"⚠️ Could not load intelligence_agent_config: {_iac_err}")
   need('validate_configuration')
   
   # Initialize core variables using centralized system
@@ -244,10 +249,7 @@ code: |
     logo_url = logo_file.url_for()
     log(f"⚠️ Using fallback logo URL: {logo_url}")
   
-  # Debug: Check what logo_url actually contains
-  log(f"🔍 Final logo_url value: {logo_url}")
-  log(f"🔍 logo_file.url_for(): {logo_file.url_for()}")
-  log(f"🔍 logo_file exists: {logo_file}")
+  # Debug: logo ready
   
   # Set global logo URL for use in templates
   global_logo_url = logo_url
@@ -1118,6 +1120,175 @@ code: |
   except Exception as _prep_err:
     log(f"⚠️ Failed to precompute next_best_actions: {_prep_err}")
 
+  # Resolve help tokens only; do not generate help on results
+  try:
+    need('capture_help_tokens_block')
+  except Exception as _tok_err:
+    log(f"⚠️ Could not run capture_help_tokens: {_tok_err}")
+
+---
+# =============================================================================
+# TOKEN TRACKING DEPENDENCY
+# =============================================================================
+# Purpose: Ensure help function token variables are captured in main session
+# Issue: Help function runs in separate context via need() - tokens not transferred
+# Solution: Force dependency on help token variables to transfer to main session
+
+id: ensure_help_tokens_block
+code: |
+  # Disabled: Do NOT generate help on results or post-questions phases
+  pass
+
+---
+id: capture_help_tokens_block
+code: |
+  # HELP TOKENS
+  # Per-call: help_prompt_tokens, help_completion_tokens, help_total_tokens
+  # Totals: help_prompt_tokens_total, help_completion_tokens_total, help_total_tokens_total
+  # Display prefers totals; triggers one help run if still zero; approximates as last resort.
+  # Extract both totals and per-call values without overwriting
+  # Read totals (no _internal fallback needed)
+  tot_prompt = help_prompt_tokens_total if defined('help_prompt_tokens_total') else 0
+  tot_completion = help_completion_tokens_total if defined('help_completion_tokens_total') else 0
+  tot_total = help_total_tokens_total if defined('help_total_tokens_total') else 0
+
+  # Read per-call values from globals before we assign anything locally
+  try:
+    per_prompt = globals().get('help_prompt_tokens', 0)
+  except Exception:
+    per_prompt = 0
+  try:
+    per_completion = globals().get('help_completion_tokens', 0)
+  except Exception:
+    per_completion = 0
+  try:
+    per_total = globals().get('help_total_tokens', 0)
+  except Exception:
+    per_total = 0
+
+  # Resolve display values for results/docx:
+  # - help_*_tokens: last-call values (accurate for most recent help)
+  # - help_*_tokens_total: accumulated totals across allowed calls (per-category)
+  help_prompt_tokens = per_prompt or 0
+  help_completion_tokens = per_completion or 0
+  help_total_tokens = per_total or 0
+
+  # If totals are zero but per-call has data, persist into totals for downstream consumers
+  if (tot_prompt or 0) == 0 and (per_prompt or 0) > 0:
+    help_prompt_tokens_total = per_prompt
+    define('help_prompt_tokens_total', help_prompt_tokens_total)
+  if (tot_completion or 0) == 0 and (per_completion or 0) > 0:
+    help_completion_tokens_total = per_completion
+    define('help_completion_tokens_total', help_completion_tokens_total)
+  if (tot_total or 0) == 0 and (per_total or 0) > 0:
+    help_total_tokens_total = per_total
+    define('help_total_tokens_total', help_total_tokens_total)
+
+  # If still zero/undefined, force a one-shot help generation and re-read
+  try:
+    if (not help_prompt_tokens) and (not help_completion_tokens) and (not help_total_tokens):
+      need('generate_intelligence_agent_content')
+      # Re-read totals after generation
+      if defined('help_prompt_tokens_total'):
+        help_prompt_tokens = help_prompt_tokens_total
+      if defined('help_completion_tokens_total'):
+        help_completion_tokens = help_completion_tokens_total
+      if defined('help_total_tokens_total'):
+        help_total_tokens = help_total_tokens_total
+  except Exception as _force_err:
+    log(f"⚠️ Force help gen failed: {_force_err}")
+
+  # Expose simple variables for UI/doc usage
+  define('help_prompt_tokens', help_prompt_tokens)
+  define('help_completion_tokens', help_completion_tokens)
+  define('help_total_tokens', help_total_tokens)
+  # If last-call not provided (older sessions), mirror to last_call vars so DOCX can use either
+  if not defined('help_prompt_tokens_last_call'):
+    define('help_prompt_tokens_last_call', help_prompt_tokens)
+  if not defined('help_completion_tokens_last_call'):
+    define('help_completion_tokens_last_call', help_completion_tokens)
+  if not defined('help_total_tokens_last_call'):
+    define('help_total_tokens_last_call', help_total_tokens)
+  define('help_prompt_tokens_total', help_prompt_tokens if not defined('help_prompt_tokens_total') else help_prompt_tokens_total)
+  define('help_completion_tokens_total', help_completion_tokens if not defined('help_completion_tokens_total') else help_completion_tokens_total)
+  define('help_total_tokens_total', help_total_tokens if not defined('help_total_tokens_total') else help_total_tokens_total)
+
+  # No approximation: if no help ran, values remain 0 to reflect true usage
+
+  # Stable display variables used by the results screen
+  help_display_prompt = help_prompt_tokens
+  help_display_completion = help_completion_tokens
+  help_display_total = help_total_tokens
+  define('help_display_prompt', help_display_prompt)
+  define('help_display_completion', help_display_completion)
+  define('help_display_total', help_display_total)
+
+  log(f"✅ Help tokens ready: prompt={help_prompt_tokens}, completion={help_completion_tokens}, total={help_total_tokens}")
+  capture_help_tokens = True
+  # Mark this block as satisfied for screens that list it under need:
+  capture_help_tokens_block = True
+
+  # Debug strings for DOCX/UI; recompute from latest resolved values with spacing
+  try:
+    help_tokens_debug = f"{help_prompt_tokens} | {help_completion_tokens} | {help_total_tokens}"
+  except Exception:
+    help_tokens_debug = "0 | 0 | 0"
+  try:
+    _mp = total_prompt_tokens if defined('total_prompt_tokens') else 0
+    _mc = total_completion_tokens if defined('total_completion_tokens') else 0
+    _mt = total_tokens if defined('total_tokens') else 0
+    main_tokens_debug = f"{_mp} | {_mc} | { _mt }"
+  except Exception:
+    main_tokens_debug = "0 | 0 | 0"
+  define('help_tokens_debug', help_tokens_debug)
+  define('main_tokens_debug', main_tokens_debug)
+
+---
+# Ensure help tokens exist for DOCX before attachment render
+id: prepare_help_tokens_for_doc
+code: |
+  try:
+    if defined('use_intelligence_agent') and use_intelligence_agent:
+      need('generate_intelligence_agent_content')
+  except Exception as _e:
+    log(f"⚠️ prepare_help_tokens_for_doc failed to generate help: {_e}")
+  # Guarantee totals exist
+  if not defined('help_prompt_tokens_total'):
+    help_prompt_tokens_total = 0
+  if not defined('help_completion_tokens_total'):
+    help_completion_tokens_total = 0
+  if not defined('help_total_tokens_total'):
+    help_total_tokens_total = 0
+  define('help_prompt_tokens_total', help_prompt_tokens_total)
+  define('help_completion_tokens_total', help_completion_tokens_total)
+  define('help_total_tokens_total', help_total_tokens_total)
+  # Mark this block as satisfied for screens that list it under need:
+  prepare_help_tokens_for_doc = True
+
+---
+# Transfer main report token variables from background task to main session
+id: transfer_main_report_tokens
+code: |
+  # Ensure main report token variables are available in main session
+  # These come from the background task but need explicit transfer
+  if not defined('total_prompt_tokens'):
+    total_prompt_tokens = 0
+  if not defined('total_completion_tokens'):
+    total_completion_tokens = 0
+  if not defined('total_tokens'):
+    total_tokens = 0
+  
+  # Log the values for debugging
+  log(f"📊 Main report tokens: prompt={total_prompt_tokens}, completion={total_completion_tokens}, total={total_tokens}")
+  
+  # Ensure they're defined in the session
+  define('total_prompt_tokens', total_prompt_tokens)
+  define('total_completion_tokens', total_completion_tokens)
+  define('total_tokens', total_tokens)
+  
+  # Mark this dependency as satisfied so need: can resolve it
+  transfer_main_report_tokens = True
+
 ---
 # =============================================================================
 # ASSESSMENT RESULTS DISPLAY
@@ -1137,9 +1308,6 @@ logo: |
 
 subquestion: |
   Your personalized diagnostic report has been generated and is ready for download below.
-
-  
-
 
 attachments:
   # Professional assessment report with AI insights and visualizations
@@ -1206,14 +1374,27 @@ attachments:
       selected_pain_points_details: ${selected_pain_points_details if defined('selected_pain_points_details') else []}
       custom_challenges_text: ${custom_challenges_text if defined('custom_challenges_text') else ''}
       user_selected_challenges: ${user_selected_challenges if defined('user_selected_challenges') else {}}
+      # Token usage tracking
+      total_prompt_tokens: ${total_prompt_tokens if defined('total_prompt_tokens') else 0}
+      total_completion_tokens: ${total_completion_tokens if defined('total_completion_tokens') else 0}
+      total_tokens: ${total_tokens if defined('total_tokens') else 0}
+      # Help function token usage tracking (use non-total variables to avoid timing issues)
+      help_prompt_tokens: ${help_prompt_tokens if defined('help_prompt_tokens') else (help_prompt_tokens_total if defined('help_prompt_tokens_total') else 0)}
+      help_completion_tokens: ${help_completion_tokens if defined('help_completion_tokens') else (help_completion_tokens_total if defined('help_completion_tokens_total') else 0)}
+      help_total_tokens: ${help_total_tokens if defined('help_total_tokens') else (help_total_tokens_total if defined('help_total_tokens_total') else 0)}
+      # Also expose *_total keys for DOCX templates that reference totals directly
+      help_prompt_tokens_total: ${help_prompt_tokens_total if defined('help_prompt_tokens_total') else (help_prompt_tokens if defined('help_prompt_tokens') else 0)}
+      help_completion_tokens_total: ${help_completion_tokens_total if defined('help_completion_tokens_total') else (help_completion_tokens if defined('help_completion_tokens') else 0)}
+      help_total_tokens_total: ${help_total_tokens_total if defined('help_total_tokens_total') else (help_total_tokens if defined('help_total_tokens') else 0)}
+      # Debug strings for DOCX to verify values render
+      help_tokens_debug: ${ (str(help_prompt_tokens_total) if defined('help_prompt_tokens_total') else '0') + ' | ' + (str(help_completion_tokens_total) if defined('help_completion_tokens_total') else '0') + ' | ' + (str(help_total_tokens_total) if defined('help_total_tokens_total') else '0') }
+      main_tokens_debug: ${ (str(total_prompt_tokens) if defined('total_prompt_tokens') else '0') + ' | ' + (str(total_completion_tokens) if defined('total_completion_tokens') else '0') + ' | ' + (str(total_tokens) if defined('total_tokens') else '0') }
     valid formats:
       - docx
       - pdf
 
-# Remove default buttons - we use custom sticky footer buttons instead
-# buttons:
-#   - Restart: restart
-#   - Exit: exit
+# Provide native buttons (hidden via CSS/JS) so footer can proxy-click them
+# Do not render native buttons; stylized footer will handle navigation
 
 # =============================================================================
 # RESULTS SCREEN UI ENHANCEMENTS
@@ -1264,13 +1445,23 @@ under: |
     } else {
       console.log('Footer not found!');
     }
-    function nativeActionButtons(){
+    function submitAction(actionName){
       var form = document.getElementById('daform') || document.querySelector('form.daformmultiplechoice');
-      if (!form) return [];
-      return form.querySelectorAll('fieldset.da-button-set button');
+      if (!form) return;
+      try {
+        // Create a hidden input to signal restart/exit and submit the native form
+        var inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = actionName; // 'restart' or 'exit'
+        inp.value = '1';
+        form.appendChild(inp);
+        form.submit();
+      } catch(e) {
+        console.log('Submit action error:', e);
+      }
     }
-    function clickRestart(){ var btns = nativeActionButtons(); if (btns && btns[0]) btns[0].click(); }
-    function clickExit(){ var btns = nativeActionButtons(); if (btns && btns[1]) btns[1].click(); }
+    function clickRestart(){ submitAction('restart'); }
+    function clickExit(){ submitAction('exit'); }
     document.addEventListener('click', function(e){
       var t = e.target;
       if (!t) return;
@@ -1280,28 +1471,33 @@ under: |
 
     // Hide top native buttons on this screen with a simple persistent hide
     function hideTopButtons(){
+      // Hide any native top button sets if present
       var form = document.getElementById('daform') || document.querySelector('form.daformmultiplechoice');
       if (!form) return;
       var sets = form.querySelectorAll('fieldset.da-button-set, fieldset.da-field-buttons');
-      sets.forEach(function(fs){ try { fs.style.setProperty('display', 'none', 'important'); } catch(e){} });
-      
-      // Also hide any buttons that might be generated by the attachment system
-      var allButtons = document.querySelectorAll('button.btn-warning, button.btn-danger, button.btn-outline-warning, button.btn-outline-danger');
-      allButtons.forEach(function(btn){ 
-        try { 
-          btn.style.setProperty('display', 'none', 'important'); 
-          btn.style.setProperty('visibility', 'hidden', 'important');
-        } catch(e){} 
+      sets.forEach(function(fs){
+        try {
+          fs.style.setProperty('display', 'none', 'important');
+          fs.style.setProperty('visibility', 'hidden', 'important');
+        } catch(e){}
+      });
+    }
+
+    // Remove any yellow/red buttons (warning/danger) to keep only grey styles
+    function hideUnwantedButtons(){
+      var unwanted = document.querySelectorAll('button.btn-warning, button.btn-danger, button.btn-outline-warning, button.btn-outline-danger');
+      unwanted.forEach(function(btn){
+        try { btn.style.setProperty('display', 'none', 'important'); } catch(e){}
       });
     }
     hideTopButtons();
-    var mo = new MutationObserver(hideTopButtons);
+    var mo = new MutationObserver(function(){ hideTopButtons(); hideUnwantedButtons(); });
     mo.observe(document.getElementById('daform') || document.body, { childList: true, subtree: true });
     
     // Also hide buttons immediately and on any DOM changes
-    setTimeout(hideTopButtons, 100);
-    setTimeout(hideTopButtons, 500);
-    setTimeout(hideTopButtons, 1000);
+    setTimeout(function(){ hideTopButtons(); hideUnwantedButtons(); }, 100);
+    setTimeout(function(){ hideTopButtons(); hideUnwantedButtons(); }, 500);
+    setTimeout(function){ hideTopButtons(); hideUnwantedButtons(); }, 1000);
 
     // Force the attachment success alert (green) to render as primary/blue
     // and collapse any gap above it (including stray <hr>, hidden headings, or sibling margins)
@@ -1482,7 +1678,11 @@ under: |
 
 # Remove default buttons entirely on the final screen
 hide continue button: "True"
-need: comprehensive_variables_defined
+need:
+  - comprehensive_variables_defined
+  - prepare_help_tokens_for_doc
+  - capture_help_tokens_block
+  - transfer_main_report_tokens
 
 # Show results as soon as the user has chosen to proceed
 show if: defined('proceeded_to_results') and proceeded_to_results

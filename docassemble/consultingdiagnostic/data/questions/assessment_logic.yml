@@ -562,6 +562,19 @@ code: |
             top_three_offerings = _ai_result.get('top_three_offerings')
             define('top_three_offerings', top_three_offerings)
             log(f"✅ MERGED: top_three_offerings ({top_three_offerings})")
+          # Merge token usage data
+          if 'total_prompt_tokens' in _ai_result:
+            total_prompt_tokens = _ai_result.get('total_prompt_tokens')
+            define('total_prompt_tokens', total_prompt_tokens)
+            log(f"✅ MERGED: total_prompt_tokens ({total_prompt_tokens})")
+          if 'total_completion_tokens' in _ai_result:
+            total_completion_tokens = _ai_result.get('total_completion_tokens')
+            define('total_completion_tokens', total_completion_tokens)
+            log(f"✅ MERGED: total_completion_tokens ({total_completion_tokens})")
+          if 'total_tokens' in _ai_result:
+            total_tokens = _ai_result.get('total_tokens')
+            define('total_tokens', total_tokens)
+            log(f"✅ MERGED: total_tokens ({total_tokens})")
           # Compute other_available_offerings now that top_three_offerings is known
           try:
             _canonical_offerings = [

@@ -83,7 +83,16 @@ code: |
     'questions_processed': False,
     'feedback_provided': False,
     'proceeded_to_results': False,
-    'comprehensive_variables_defined': False
+    'comprehensive_variables_defined': False,
+    'total_prompt_tokens': 0,
+    'total_completion_tokens': 0,
+    'total_tokens': 0,
+    'help_prompt_tokens': 0,
+    'help_completion_tokens': 0,
+    'help_total_tokens': 0,
+    'help_prompt_tokens_total': 0,
+    'help_completion_tokens_total': 0,
+    'help_total_tokens_total': 0
   }
   
   # Ensure pain points variables are always initialized
@@ -715,6 +724,18 @@ code: |
     'challenge_questions': (challenge_questions if defined('challenge_questions') else ''),
     'recommended_services': (recommended_services if defined('recommended_services') else ''),
     'ai_processing_complete': (ai_processing_complete if defined('ai_processing_complete') else False),
+    
+    # Token usage tracking
+    'total_prompt_tokens': (total_prompt_tokens if defined('total_prompt_tokens') else 0),
+    'total_completion_tokens': (total_completion_tokens if defined('total_completion_tokens') else 0),
+    'total_tokens': (total_tokens if defined('total_tokens') else 0),
+    # Help function token usage tracking
+    'help_prompt_tokens': (help_prompt_tokens if defined('help_prompt_tokens') else 0),
+    'help_completion_tokens': (help_completion_tokens if defined('help_completion_tokens') else 0),
+    'help_total_tokens': (help_total_tokens if defined('help_total_tokens') else 0),
+    'help_prompt_tokens_total': (help_prompt_tokens_total if defined('help_prompt_tokens_total') else 0),
+    'help_completion_tokens_total': (help_completion_tokens_total if defined('help_completion_tokens_total') else 0),
+    'help_total_tokens_total': (help_total_tokens_total if defined('help_total_tokens_total') else 0),
     
     # Plot files
     'radar_plot': radar_plot if defined('radar_plot') and radar_plot and hasattr(radar_plot, 'filename') else None,

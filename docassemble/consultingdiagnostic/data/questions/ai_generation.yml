@@ -209,8 +209,22 @@ code: |
             content_parts.append(chunk.choices[0].delta.content)
         
         content = ''.join(content_parts).strip()
+        
+        # For streaming, we don't have usage info, so set to 0
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+        
         log(f"✅ Streaming completed successfully: {len(content)} chars")
-        return content
+        log(f"🔢 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+        
+        # Return both content and token usage
+        return {
+          'content': content,
+          'prompt_tokens': prompt_tokens,
+          'completion_tokens': completion_tokens,
+          'total_tokens': total_tokens
+        }
         
       except Exception as stream_error:
         log(f"⚠️ Streaming failed: {stream_error}, trying non-streaming...")
@@ -229,9 +243,23 @@ code: |
             )
             
             content = response.choices[0].message.content.strip()
+            
+            # Capture token usage from API response
+            prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+            completion_tokens = response.usage.completion_tokens if response.usage else 0
+            total_tokens = response.usage.total_tokens if response.usage else 0
+            
             log(f"✅ Non-streaming API call completed successfully")
             log(f"✅ {prompt_key}: {len(content)} chars")
-            return content
+            log(f"🔢 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+            
+            # Return both content and token usage
+            return {
+              'content': content,
+              'prompt_tokens': prompt_tokens,
+              'completion_tokens': completion_tokens,
+              'total_tokens': total_tokens
+            }
             
           except Exception as e:
             if attempt < max_retries:
@@ -473,8 +501,22 @@ code: |
             content_parts.append(chunk.choices[0].delta.content)
         
         content = ''.join(content_parts).strip()
+        
+        # For streaming, we don't have usage info, so set to 0
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+        
         log(f"✅ Streaming completed successfully: {len(content)} chars")
-        return content
+        log(f"🔢 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+        
+        # Return both content and token usage
+        return {
+          'content': content,
+          'prompt_tokens': prompt_tokens,
+          'completion_tokens': completion_tokens,
+          'total_tokens': total_tokens
+        }
         
       except Exception as stream_error:
         log(f"⚠️ Streaming failed: {stream_error}, trying non-streaming...")
@@ -493,9 +535,23 @@ code: |
             )
             
             content = response.choices[0].message.content.strip()
+            
+            # Capture token usage from API response
+            prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+            completion_tokens = response.usage.completion_tokens if response.usage else 0
+            total_tokens = response.usage.total_tokens if response.usage else 0
+            
             log(f"✅ Non-streaming API call completed successfully")
             log(f"✅ {prompt_key}: {len(content)} chars")
-            return content
+            log(f"🔢 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+            
+            # Return both content and token usage
+            return {
+              'content': content,
+              'prompt_tokens': prompt_tokens,
+              'completion_tokens': completion_tokens,
+              'total_tokens': total_tokens
+            }
             
           except Exception as e:
             if attempt < max_retries:
@@ -739,8 +795,22 @@ code: |
             content_parts.append(chunk.choices[0].delta.content)
         
         content = ''.join(content_parts).strip()
+        
+        # For streaming, we don't have usage info, so set to 0
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+        
         log(f"✅ Streaming completed successfully: {len(content)} chars")
-        return content
+        log(f"🔢 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+        
+        # Return both content and token usage
+        return {
+          'content': content,
+          'prompt_tokens': prompt_tokens,
+          'completion_tokens': completion_tokens,
+          'total_tokens': total_tokens
+        }
         
       except Exception as stream_error:
         log(f"⚠️ Streaming failed: {stream_error}, trying non-streaming...")
@@ -759,9 +829,23 @@ code: |
             )
             
             content = response.choices[0].message.content.strip()
+            
+            # Capture token usage from API response
+            prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+            completion_tokens = response.usage.completion_tokens if response.usage else 0
+            total_tokens = response.usage.total_tokens if response.usage else 0
+            
             log(f"✅ Non-streaming API call completed successfully")
             log(f"✅ {prompt_key}: {len(content)} chars")
-            return content
+            log(f"🔢 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+            
+            # Return both content and token usage
+            return {
+              'content': content,
+              'prompt_tokens': prompt_tokens,
+              'completion_tokens': completion_tokens,
+              'total_tokens': total_tokens
+            }
             
           except Exception as e:
             if attempt < max_retries:
@@ -1003,8 +1087,22 @@ code: |
             content_parts.append(chunk.choices[0].delta.content)
         
         content = ''.join(content_parts).strip()
+        
+        # For streaming, we don't have usage info, so set to 0
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+        
         log(f"✅ Streaming completed successfully: {len(content)} chars")
-        return content
+        log(f"🔢 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+        
+        # Return both content and token usage
+        return {
+          'content': content,
+          'prompt_tokens': prompt_tokens,
+          'completion_tokens': completion_tokens,
+          'total_tokens': total_tokens
+        }
         
       except Exception as stream_error:
         log(f"⚠️ Streaming failed: {stream_error}, trying non-streaming...")
@@ -1023,9 +1121,23 @@ code: |
             )
             
             content = response.choices[0].message.content.strip()
+            
+            # Capture token usage from API response
+            prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+            completion_tokens = response.usage.completion_tokens if response.usage else 0
+            total_tokens = response.usage.total_tokens if response.usage else 0
+            
             log(f"✅ Non-streaming API call completed successfully")
             log(f"✅ {prompt_key}: {len(content)} chars")
-            return content
+            log(f"🔢 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+            
+            # Return both content and token usage
+            return {
+              'content': content,
+              'prompt_tokens': prompt_tokens,
+              'completion_tokens': completion_tokens,
+              'total_tokens': total_tokens
+            }
             
           except Exception as e:
             if attempt < max_retries:
@@ -1339,8 +1451,22 @@ code: |
             content_parts.append(chunk.choices[0].delta.content)
         
         content = ''.join(content_parts).strip()
+        
+        # For streaming, we don't have usage info, so set to 0
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+        
         log(f"✅ Streaming completed successfully: {len(content)} chars")
-        return content
+        log(f"🔢 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+        
+        # Return both content and token usage
+        return {
+          'content': content,
+          'prompt_tokens': prompt_tokens,
+          'completion_tokens': completion_tokens,
+          'total_tokens': total_tokens
+        }
         
       except Exception as stream_error:
         log(f"⚠️ Streaming failed: {stream_error}, trying non-streaming...")
@@ -1359,9 +1485,23 @@ code: |
             )
             
             content = response.choices[0].message.content.strip()
+            
+            # Capture token usage from API response
+            prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+            completion_tokens = response.usage.completion_tokens if response.usage else 0
+            total_tokens = response.usage.total_tokens if response.usage else 0
+            
             log(f"✅ Non-streaming API call completed successfully")
             log(f"✅ {prompt_key}: {len(content)} chars")
-            return content
+            log(f"🔢 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}")
+            
+            # Return both content and token usage
+            return {
+              'content': content,
+              'prompt_tokens': prompt_tokens,
+              'completion_tokens': completion_tokens,
+              'total_tokens': total_tokens
+            }
             
           except Exception as e:
             if attempt < max_retries:

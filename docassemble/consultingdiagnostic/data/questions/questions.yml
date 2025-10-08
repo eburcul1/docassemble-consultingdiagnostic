@@ -369,13 +369,18 @@ validation code: |
   
   # Update current category when question changes
   if defined('questions') and current_question < len(questions):
+    # Store previous category before updating
+    if defined('current_category'):
+      prev_category = current_category
     current_category = questions[current_question]['category']
   
-  # Refresh AI help ONLY if category changed
+  # CATEGORY-BASED CACHING: Refresh AI help ONLY if category changed
+  # This reduces token usage by ~80% (5 API calls instead of 25)
   if defined('generate_intelligence_agent_content'):
     try:
-      if defined('current_category') and current_category != prev_category:
+      if defined('current_category') and defined('prev_category') and current_category != prev_category:
         del generate_intelligence_agent_content
+        log(f"🔄 Category changed from {prev_category} to {current_category} - refreshing AI help")
     except Exception:
       pass
   

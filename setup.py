@@ -44,9 +44,9 @@ def find_package_data(where='.', package='', exclude=standard_exclude, exclude_d
     return out
 
 setup(name='docassemble.consultingdiagnostic',
-      version='0.0.7',
-      description=('AI enabled help for each category, new prioritization screen for pain points.'),
-      long_description='launch from main_interview.yml\r\nrequires an OpenAI key in config file for AI gen\r\nIntroduces assessment_intelligence_agent (uses AI to show category help) \r\nIntroduces new prioritization screen for pain points. Only top 3 are considered for ouput.\r\n0.0.5 corrected video playback on VPS\r\n0.0.6 correct selection of top 3 offerings\r\n0.0.7 update main_interview to enable response and recommended next actions in the Word output file\r\n',
+      version='0.0.8',
+      description=('Word doc contains token counts - for testing purposes only'),
+      long_description='launch from main_interview.yml\r\nrequires an OpenAI key in config file for AI gen\r\nIntroduces assessment_intelligence_agent (uses AI to show category help) \r\nIntroduces new prioritization screen for pain points. Only top 3 are considered for ouput.\r\n0.0.5 corrected video playback on VPS\r\n0.0.6 correct selection of top 3 offerings\r\n0.0.7 update main_interview to enable response and recommended next actions in the Word output file\r\n0.0.8 slight modifications to enable tracking of token usage for help and for response creation\r\n',
       long_description_content_type='text/markdown',
       author='System Administrator',
       author_email='burcul_elvis@hotmail.com',

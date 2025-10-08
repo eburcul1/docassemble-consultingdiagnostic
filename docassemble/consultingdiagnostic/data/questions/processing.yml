@@ -339,6 +339,11 @@ code: |
   else:
     client = None
   
+  # Initialize token tracking
+  total_prompt_tokens = 0
+  total_completion_tokens = 0
+  total_tokens = 0
+  
   # Generate AI content if client is available
   if client and ai_prompts:
     try:
@@ -394,6 +399,14 @@ code: |
           temperature=config.get('temperature', 0.6)
         )
         executive_summary = response.choices[0].message.content.strip()
+        
+        # Capture token usage
+        if response.usage:
+          total_prompt_tokens += response.usage.prompt_tokens
+          total_completion_tokens += response.usage.completion_tokens
+          total_tokens += response.usage.total_tokens
+          # token usage captured
+        
         log(f"✅ BG: Generated executive_summary ({len(executive_summary)} chars)")
       else:
         executive_summary = "Executive summary generation failed - no prompt available"
@@ -426,6 +439,14 @@ code: |
           temperature=config.get('temperature', 0.8)
         )
         contradictions_insights = response.choices[0].message.content.strip()
+        
+        # Capture token usage
+        if response.usage:
+          total_prompt_tokens += response.usage.prompt_tokens
+          total_completion_tokens += response.usage.completion_tokens
+          total_tokens += response.usage.total_tokens
+          # token usage captured
+        
         log(f"✅ BG: Generated contradictions_insights ({len(contradictions_insights)} chars)")
       else:
         contradictions_insights = "Strategic insights generation failed - no prompt available"
@@ -458,6 +479,14 @@ code: |
           temperature=config.get('temperature', 0.7)
         )
         challenge_questions = response.choices[0].message.content.strip()
+        
+        # Capture token usage
+        if response.usage:
+          total_prompt_tokens += response.usage.prompt_tokens
+          total_completion_tokens += response.usage.completion_tokens
+          total_tokens += response.usage.total_tokens
+          # token usage captured
+        
         log(f"✅ BG: Generated challenge_questions ({len(challenge_questions)} chars)")
       else:
         challenge_questions = "Challenge questions generation failed - no prompt available"
@@ -494,6 +523,14 @@ code: |
           temperature=config.get('temperature', 0.6)
         )
         recommended_services = response.choices[0].message.content.strip()
+        
+        # Capture token usage
+        if response.usage:
+          total_prompt_tokens += response.usage.prompt_tokens
+          total_completion_tokens += response.usage.completion_tokens
+          total_tokens += response.usage.total_tokens
+          # token usage captured
+        
         log(f"✅ BG: Generated recommended_services ({len(recommended_services)} chars)")
       else:
         recommended_services = "Recommended services generation failed - no prompt available"
@@ -555,6 +592,13 @@ code: |
         )
         top_three_response = response.choices[0].message.content.strip()
         
+        # Capture token usage
+        if response.usage:
+          total_prompt_tokens += response.usage.prompt_tokens
+          total_completion_tokens += response.usage.completion_tokens
+          total_tokens += response.usage.total_tokens
+          # token usage captured
+        
         # Parse JSON response
         try:
           import json
@@ -594,11 +638,20 @@ code: |
             temperature=rec_cfg.get('temperature', 0.3)
           )
           recommended_services = rec_response.choices[0].message.content.strip()
+          
+          # Capture token usage for regeneration
+          if rec_response.usage:
+            total_prompt_tokens += rec_response.usage.prompt_tokens
+            total_completion_tokens += rec_response.usage.completion_tokens
+            total_tokens += rec_response.usage.total_tokens
+          # token usage captured
+          
           log("✅ BG: Regenerated recommended_services to match top_three_offerings")
       except Exception as __re:
         log(f"⚠️ BG: Failed to regenerate recommended_services: {__re}")
 
       log("✅ BG: All AI content generated successfully")
+      # consolidated totals computed
       
     except Exception as e:
       log(f"❌ BG: Error generating AI content: {e}")
@@ -622,6 +675,9 @@ code: |
   define('challenge_questions', challenge_questions)
   define('recommended_services', recommended_services)
   define('top_three_offerings', top_three_offerings)
+  define('total_prompt_tokens', total_prompt_tokens)
+  define('total_completion_tokens', total_completion_tokens)
+  define('total_tokens', total_tokens)
   log("✅ BG: Variables set in session")
   
   # Return results via background_response to properly complete the task
@@ -630,7 +686,10 @@ code: |
     'contradictions_insights': contradictions_insights,
     'challenge_questions': challenge_questions,
     'recommended_services': recommended_services,
-    'top_three_offerings': top_three_offerings
+    'top_three_offerings': top_three_offerings,
+    'total_prompt_tokens': total_prompt_tokens,
+    'total_completion_tokens': total_completion_tokens,
+    'total_tokens': total_tokens
   }
   
   from docassemble.base.util import background_response

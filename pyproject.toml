@@ -6,8 +6,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docassemble.consultingdiagnostic"
-version = "0.0.7"
-description = "AI enabled help for each category, new prioritization screen for pain points."
+version = "0.0.8"
+description = "Word doc contains token counts - for testing purposes only"
 readme = "README.md"
 authors = [
     { name = "System Administrator", email = "burcul_elvis@hotmail.com" },
