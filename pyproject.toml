@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "docassemble.consultingdiagnostic"
 version = "0.1.0"
-description = "Word doc contains token counts - for testing purposes only"
+description = "Update word doc, correct deft in top 3 offers selection"
 readme = "README.md"
 authors = [
     { name = "System Administrator", email = "burcul_elvis@hotmail.com" },
