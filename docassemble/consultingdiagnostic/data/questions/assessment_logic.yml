@@ -562,6 +562,40 @@ code: |
             top_three_offerings = _ai_result.get('top_three_offerings')
             define('top_three_offerings', top_three_offerings)
             log(f"✅ MERGED: top_three_offerings ({top_three_offerings})")
+            
+            # Build top_three_template_paths now that top_three_offerings is available
+            top_three_template_paths = []
+            try:
+              if defined('offering_name_to_template_path') and top_three_offerings:
+                log(f"🔍 Building top_three_template_paths from {len(top_three_offerings)} offerings")
+                log(f"🔍 offering_name_to_template_path keys: {list(offering_name_to_template_path.keys())}")
+                
+                for i, _off in enumerate(top_three_offerings):
+                  log(f"🔍 Processing offering {i+1}: '{_off}'")
+                  _tpl = offering_name_to_template_path.get(_off)
+                  if _tpl:
+                    top_three_template_paths.append(_tpl)
+                    log(f"✅ Added template path: {_tpl}")
+                  else:
+                    log(f"⚠️ No template path found for offering: '{_off}'")
+                    # Try to find a close match
+                    for key in offering_name_to_template_path.keys():
+                      if _off.lower().replace('&', 'and') in key.lower().replace('&', 'and'):
+                        top_three_template_paths.append(offering_name_to_template_path[key])
+                        log(f"✅ Found close match: '{key}' -> {offering_name_to_template_path[key]}")
+                        break
+                    else:
+                      log(f"❌ No close match found for: '{_off}'")
+                
+                log(f"✅ Built top_three_template_paths: {top_three_template_paths} (length: {len(top_three_template_paths)})")
+              else:
+                log(f"⚠️ Missing dependencies: offering_name_to_template_path={defined('offering_name_to_template_path')}, top_three_offerings={top_three_offerings}")
+            except Exception as _map_err:
+              log(f"⚠️ Failed to build top_three_template_paths: {_map_err}")
+            
+            # Always define the variable, even if empty
+            define('top_three_template_paths', top_three_template_paths)
+            log(f"🔍 Final top_three_template_paths: {top_three_template_paths}")
           # Merge token usage data
           if 'total_prompt_tokens' in _ai_result:
             total_prompt_tokens = _ai_result.get('total_prompt_tokens')

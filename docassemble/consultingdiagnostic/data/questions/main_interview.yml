@@ -2,7 +2,7 @@
 metadata:
   title: Consulting Services Diagnostic
   short title: 
-  version: "0.0.8"
+  version: "0.1.0"
   description: |
     Complete diagnostic system for consulting services.
     
@@ -81,7 +81,7 @@ metadata:
     - State recovery for interrupted sessions
     
     Author: Veloquent Consulting
-    Last Updated: October 8 2025
+    Last Updated: January 2025
     License: Proprietary - Veloquent Consulting
   required privileges:
     - admin
@@ -866,23 +866,18 @@ code: |
         for i, _d in enumerate(offering_document_files_list[:5]):
           log(f"    ORDER {i+1}: {_d.name} -> {_d.template_path}")
 
-        # Build explicit ordered template paths for top three to be used directly by DOCX
-        try:
-          top_three_template_paths = []
-          if defined('offering_name_to_template_path'):
-            for _off in top_three_offerings:
-              _tpl = offering_name_to_template_path.get(_off)
-              if _tpl:
-                top_three_template_paths.append(_tpl)
-          define('top_three_template_paths', top_three_template_paths)
-          log(f"✅ Built top_three_template_paths: {top_three_template_paths}")
-        except Exception as _map_err:
-          log(f"⚠️ Failed to build top_three_template_paths: {_map_err}")
+        # Note: top_three_template_paths will be built after AI results are merged
     except Exception as _order_err:
       log(f"⚠️ Failed to reorder offering_document_files_list: {_order_err}")
     
   except Exception as _e:
     log(f"⚠️ Failed to set other_available_offerings: {_e}")
+  
+  # Ensure top_three_template_paths is always defined for template usage
+  if not defined('top_three_template_paths'):
+    top_three_template_paths = []
+    define('top_three_template_paths', top_three_template_paths)
+    log("✅ Fallback: top_three_template_paths set to empty list")
 
   # ===========================================================================
   # PRECOMPUTE ANSWER LEVELS AND NEXT BEST ACTIONS FOR DOCX TEMPLATE
