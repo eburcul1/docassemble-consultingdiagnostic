@@ -1,60 +1,72 @@
 ---
 # =============================================================================
-# DOCUMENT GENERATOR - TEMPLATE DOCUMENT OBJECT CREATION
+# DOCUMENT GENERATOR - PNG IMAGE OBJECT CREATION FOR DOCX INSERTION
 # =============================================================================
-# Purpose: Create document objects for template iteration and document generation
-# Input: Pre-existing DOCX template files in template directory
-# Output: Structured document objects for Jinja2 template processing
-# Usage: Provides document objects for assessment report generation and proposal inserts
-# Dependencies: DOCX template files must exist in template directory
+# Purpose: Create DAFile objects from PNG template files for .show() usage in Word documents
+# Input: Pre-existing PNG template files in package templates directory
+# Output: DAFile objects with 6.5" width for Jinja2 template processing
+# Usage: Provides image objects for top 3 AI-selected offerings and other services
+# Dependencies: PNG template files must exist in package templates directory
+# Resolution: Uses path_and_mimetype() with template: prefix, fallback to bare filename,
+#            and template/static path swapping for robust cross-environment compatibility
 
 ---
 # =============================================================================
-# OFFERING DOCUMENT CONTENT LOADER
+# OFFERING IMAGE CONTENT LOADER
 # =============================================================================
-# Purpose: Create document objects for template iteration and document generation
-# Input: Pre-existing DOCX template files in template directory
-# Output: Structured document objects for Jinja2 template processing
-# Usage: Provides document objects for assessment report generation and proposal inserts
-# Dependencies: DOCX template files must exist in template directory
+# Purpose: Create image objects for template iteration and document generation
+# Input: Pre-existing PNG template files in template directory
+# Output: Structured image objects for Jinja2 template processing
+# Usage: Provides image objects for assessment report generation and proposal inserts
+# Dependencies: PNG template files must exist in template directory
 
 initial: True
 id: load_offering_document_content
 code: |
   """
-  OFFERING DOCUMENT CONTENT LOADER
+  PNG IMAGE LOADER FOR DOCX INSERTION
   
-  This block creates document objects for template iteration and document generation.
-  It processes pre-existing DOCX template files (ie the offering proposal inserts) and creates structured objects
-  that can be used in Jinja2 templates for dynamic document generation.
+  This block creates DAFile objects from PNG template files for .show() usage in Word documents.
+  It processes pre-existing PNG template files (the offering proposal inserts) and creates
+  DAFile objects that can be used in Jinja2 templates for dynamic document generation.
   
-  Document Processing:
-  - Loads 8 predefined DOCX template files for service offerings
-  - Creates DAObject instances for each template file
+  PNG Processing:
+  - Loads 8 predefined PNG template files for service offerings
+  - Creates DAFile instances for each PNG file (required for .show() method)
   - Generates human-readable names from filenames
+  - Sets image width to 6.5 inches for proper formatting
   - Provides both dictionary and list access for template flexibility
   - Defines variables globally for Jinja2 template access
   - Supports dynamic filtering based on top_three_offerings selection
   
-  Demo Template Files:
-  - Assessment Architecture and Build Proposal Insert
-  - Clarity and Visibility Accelerator Proposal Insert
-  - Growth and Loyalty Booster Proposal Insert
-  - Lead Flow Builder Proposal Insert
-  - Maturity Model Design Sprint Proposal Insert
-  - Project Excellence Toolkit Proposal Insert
-  - Proposal and Pitch Package Proposal Insert
-  - Services That Sell Workshop Proposal Insert
+  File Resolution Strategy:
+  - Primary: template:<filename> via path_and_mimetype()
+  - Fallback: bare filename via path_and_mimetype()
+  - Path correction: swaps /playgroundstatic/ -> /playgroundtemplate/ if needed
+  - Direct file read: opens resolved path and writes binary content to DAFile
+  - Environment-agnostic: works in playground and production
+  
+  Template Files (underscore format):
+  - Assessment_Architecture_and_Build_Proposal_Insert.png
+  - Clarity_and_Visibility_Accelerator_Proposal_Insert.png
+  - Growth_and_Loyalty_Booster_Proposal_Insert.png
+  - Lead_Flow_Builder_Proposal_Insert.png
+  - Maturity_Model_Design_Sprint_Proposal_Insert.png
+  - Project_Excellence_Toolkit_Proposal_Insert.png
+  - Proposal_and_Pitch_Package_Proposal_Insert.png
+  - Services_That_Sell_Workshop_Proposal_Insert.png
   
   Object Structure:
   - name: Human-readable name (e.g., "Assessment Architecture and Build")
-  - template_path: Filename for include_docx_template function
+  - template_path: Filename for image insertion
   - filename: Original filename for reference
+  - width: Image width set to 6.5 inches for consistent formatting
   
   Template Integration:
   - Objects can be iterated in Jinja2 templates
   - Supports both dictionary and list access patterns
-  - Enables dynamic document inclusion in assessment reports
+  - Enables dynamic image inclusion in assessment reports
+  - Images are inserted with 6.5" width using .show method
   
   Error Handling:
   - Graceful degradation if template files are missing
@@ -63,97 +75,260 @@ code: |
   """
   
   # Create document objects for template iteration - documents are already in template directory
-  if not defined('offering_document_content_loaded'):
-    from docassemble.base.util import DAObject
+  # Rebuild if not yet loaded OR if previous session left an empty list
+  if (not defined('offering_document_files_list')) or (not offering_document_files_list):
+    from docassemble.base.util import DAFile, path_and_mimetype, log
+    import os
     
-    # Initialize both dictionary and list for template compatibility
-    # Dictionary provides key-based access, list provides iteration capability
+    # Initialize containers for template compatibility
+    # offering_document_files: filename -> DAFile
+    # offering_document_files_list: ordered list of DAFile objects
     offering_document_files = {}
     offering_document_files_list = []
     
     try:
-      # List of expected DOCX files that are already in the template directory
+      # List of expected PNG files that are already in the template directory
       # These files contain proposal inserts for different service offerings
       expected_files = [
-        "Assessment_Architecture_and_Build_Proposal_Insert.docx",
-        "Clarity_and_Visibility_Accelerator_Proposal_Insert.docx", 
-        "Growth_and_Loyalty_Booster_Proposal_Insert.docx",
-        "Lead_Flow_Builder_Proposal_Insert.docx",
-        "Maturity_Model_Design_Sprint_Proposal_Insert.docx",
-        "Project_Excellence_Toolkit_Proposal_Insert.docx",
-        "Proposal_and_Pitch_Package_Proposal_Insert.docx",
-        "Services_That_Sell_Workshop_Proposal_Insert.docx"
+        "Assessment_Architecture_and_Build_Proposal_Insert.png",
+        "Clarity_and_Visibility_Accelerator_Proposal_Insert.png", 
+        "Growth_and_Loyalty_Booster_Proposal_Insert.png",
+        "Lead_Flow_Builder_Proposal_Insert.png",
+        "Maturity_Model_Design_Sprint_Proposal_Insert.png",
+        "Project_Excellence_Toolkit_Proposal_Insert.png",
+        "Proposal_and_Pitch_Package_Proposal_Insert.png",
+        "Services_That_Sell_Workshop_Proposal_Insert.png"
       ]
       
       # Map filenames to canonical offering names used by AI output
       filename_to_offering_name = {
-        "Assessment_Architecture_and_Build_Proposal_Insert.docx": "Assessment Architecture & Build Package",
-        "Clarity_and_Visibility_Accelerator_Proposal_Insert.docx": "Clarity & Visibility Accelerator",
-        "Growth_and_Loyalty_Booster_Proposal_Insert.docx": "Growth & Loyalty Booster",
-        "Lead_Flow_Builder_Proposal_Insert.docx": "Lead Flow Builder",
-        "Maturity_Model_Design_Sprint_Proposal_Insert.docx": "Maturity Model Design Sprint",
-        "Project_Excellence_Toolkit_Proposal_Insert.docx": "Project Excellence Toolkit",
-        "Proposal_and_Pitch_Package_Proposal_Insert.docx": "Proposal & Pitch Package",
-        "Services_That_Sell_Workshop_Proposal_Insert.docx": "Services That Sell Workshop"
+        "Assessment_Architecture_and_Build_Proposal_Insert.png": "Assessment Architecture & Build Package",
+        "Clarity_and_Visibility_Accelerator_Proposal_Insert.png": "Clarity & Visibility Accelerator",
+        "Growth_and_Loyalty_Booster_Proposal_Insert.png": "Growth & Loyalty Booster",
+        "Lead_Flow_Builder_Proposal_Insert.png": "Lead Flow Builder",
+        "Maturity_Model_Design_Sprint_Proposal_Insert.png": "Maturity Model Design Sprint",
+        "Project_Excellence_Toolkit_Proposal_Insert.png": "Project Excellence Toolkit",
+        "Proposal_and_Pitch_Package_Proposal_Insert.png": "Proposal & Pitch Package",
+        "Services_That_Sell_Workshop_Proposal_Insert.png": "Services That Sell Workshop"
       }
 
-      # Process each expected template file
+      # Discover the directory of the main DOCX to use as a fallback search root
+      docx_dir = None
+      templates_rel_dir = ''
+      try:
+        _docx_path, _ = path_and_mimetype('maturity_assessment_report.docx')
+        if _docx_path:
+          docx_dir = os.path.dirname(_docx_path)
+          log(f"🧭 Using DOCX directory as fallback for images: {docx_dir}")
+          # Derive templates-relative subdirectory (e.g., 'Oct10') without hardcoding
+          try:
+            _p = _docx_path.replace('\\', '/')
+            if '/playgroundtemplate/' in _p:
+              _after = _p.split('/playgroundtemplate/', 1)[1]
+              _parts = _after.split('/')
+              if len(_parts) >= 2:
+                # Skip numeric id segment, drop filename
+                templates_rel_dir = '/'.join(_parts[1:-1])
+            elif '/templates/' in _p:
+              _after = _p.split('/templates/', 1)[1]
+              templates_rel_dir = os.path.dirname(_after)
+          except Exception as _dir_e:
+            log(f"⚠️ Could not derive templates relative dir: {_dir_e}")
+      except Exception as _docx_e:
+        log(f"⚠️ Could not resolve DOCX directory: {_docx_e}")
+
+      # Process each expected template file into a real DAFile (required for .show())
       for filename in expected_files:
-        # Create DAObject for template iteration (what your Jinja2 template expects)
-        doc_obj = DAObject()
+        try:
+          # Prefer template lookup first; try underscore and space variants
+          template_path = None
+          mimetype = None
+          resolved_filename = filename
+          name_variants = [filename]
+          try:
+            space_variant = filename.replace('_', ' ')
+            if space_variant not in name_variants:
+              name_variants.append(space_variant)
+          except Exception:
+            pass
+          for name_try in name_variants:
+            try:
+              template_path, mimetype = path_and_mimetype(f"template:{name_try}")
+            except Exception:
+              template_path, mimetype = (None, None)
+            if template_path:
+              resolved_filename = name_try
+              break
+            # Try templates relative subdirectory next (e.g., template:Oct10/<file>)
+            if templates_rel_dir:
+              try:
+                _cand = f"template:{templates_rel_dir}/{name_try}"
+                template_path, mimetype = path_and_mimetype(_cand)
+              except Exception:
+                template_path, mimetype = (None, None)
+              if template_path:
+                resolved_filename = name_try
+                break
+            try:
+              template_path, mimetype = path_and_mimetype(name_try)
+            except Exception:
+              template_path, mimetype = (None, None)
+            if template_path:
+              resolved_filename = name_try
+              break
+          # Final fallback: if DOCX dir is known, look for the file next to the DOCX
+          if (not template_path) and docx_dir:
+            try:
+              _candidate = os.path.join(docx_dir, filename)
+              if os.path.exists(_candidate):
+                template_path = _candidate
+                mimetype = 'image/png'
+                resolved_filename = filename
+                log(f"✅ Found {filename} next to DOCX at: {template_path}")
+            except Exception as _join_e:
+              log(f"⚠️ Fallback join failed for {filename}: {_join_e}")
+          
+          if template_path and not os.path.exists(str(template_path)):
+            try:
+              _tp = str(template_path)
+              _alt = None
+              if '/playgroundstatic/' in _tp:
+                _alt = _tp.replace('/playgroundstatic/', '/playgroundtemplate/')
+              elif '/static/' in _tp:
+                _alt = _tp.replace('/static/', '/templates/')
+              if _alt and os.path.exists(_alt):
+                log(f"⚠️ Resolved path not found, using template sibling: {_alt}")
+                template_path = _alt
+            except Exception as _alt_e:
+              log(f"⚠️ Could not derive template sibling for {template_path}: {_alt_e}")
+
+          if not template_path:
+            log(f"❌ File not found by path_and_mimetype: {filename}")
+          else:
+            log(f"✅ Resolved {resolved_filename} to: {template_path}")
+        except Exception as _pe:
+          template_path = None
+          resolved_filename = None
+          mimetype = None
+          log(f"⚠️ Could not resolve path for {filename}: {_pe}")
         
-        # Set canonical name to match AI-selected offering names exactly
-        doc_obj.name = filename_to_offering_name.get(
-          filename,
-          filename.replace('_Proposal_Insert.docx', '').replace('_', ' ')
-        )
-        # Use just the filename; files are located in the package's template directory
-        doc_obj.template_path = filename
-        doc_obj.filename = filename
+        if not template_path:
+          # Try URL-based fetch from templates as a final, environment-agnostic fallback
+          try:
+            from docassemble.base.util import url_of
+            try:
+              file_url = url_of('template', filename=filename)
+            except Exception:
+              file_url = url_of(filename)
+            key_for_name = filename
+            display_name = filename_to_offering_name.get(
+              key_for_name,
+              key_for_name.replace('_Proposal_Insert.png', '').replace('_', ' ')
+            )
+            safe_label = 'offering_' + key_for_name.replace('.png','').lower()
+            doc_file = DAFile(safe_label)
+            doc_file.initialize(filename=key_for_name)
+            doc_file.fetch(file_url)
+            doc_file.commit()
+            doc_file.name = display_name
+            doc_file.template_path = key_for_name
+            doc_file.width = "6.5in"
+            offering_document_files[key_for_name] = doc_file
+            offering_document_files_list.append(doc_file)
+            log(f"✅ Loaded offering image via URL fetch: {display_name} <- {file_url}")
+            # Skip the rest of loop; continue to next filename
+            continue
+          except Exception as _url_e:
+            log(f"❌ Could not find {filename} in any location (including URL fetch): {_url_e}")
+            continue
         
-        # Store in both dictionary and list for template compatibility
-        # Dictionary allows key-based access, list allows iteration in templates
-        offering_document_files[filename] = doc_obj
-        offering_document_files_list.append(doc_obj)
+        if template_path:
+          try:
+            key_for_name = resolved_filename or filename
+            display_name = filename_to_offering_name.get(
+              key_for_name,
+              key_for_name.replace('_Proposal_Insert.png', '').replace('_', ' ')
+            )
+            safe_label = 'offering_' + key_for_name.replace('.png','').lower()
+            doc_file = DAFile(safe_label)
+            doc_file.initialize(filename=key_for_name)
+            # Prefer copy_into using located path; on failure, fetch via URL
+            try:
+              if mimetype:
+                doc_file.set_mimetype(mimetype)
+            except Exception:
+              pass
+            try:
+              if os.path.exists(str(template_path)):
+                with open(str(template_path), 'rb') as f:
+                  content = f.read()
+                doc_file.write(content, binary=True)
+                doc_file.commit()
+              else:
+                # Last resort: try copy_into if available path
+                doc_file.copy_into(template_path)
+                doc_file.commit()
+            except Exception as _cp_err:
+              log(f"❌ Final write failed for {key_for_name} from {template_path}: {_cp_err}")
+              raise _cp_err
+            # Attach helpful attributes for template logic
+            doc_file.name = display_name
+            doc_file.template_path = key_for_name
+            doc_file.width = "6.5in"
+            # Register
+            offering_document_files[key_for_name] = doc_file
+            offering_document_files_list.append(doc_file)
+            log(f"✅ Loaded offering image as DAFile: {display_name} <- {key_for_name}")
+          except Exception as _le:
+            log(f"❌ Failed loading {filename} as DAFile: {_le}")
+        else:
+          log(f"⚠️ Template path not found for {filename}")
       
-      # Build a reverse lookup: exact offering name -> template_path
+      # Build reverse lookups for template integration
+      offering_name_to_dafile = {}
       offering_name_to_template_path = {}
+      offering_document_files_by_filename = {}
       for _doc in offering_document_files_list:
         try:
           _name_key = (_doc.name or '').strip()
-          if _name_key and _name_key not in offering_name_to_template_path:
+          if _name_key:
+            offering_name_to_dafile[_name_key] = _doc
             offering_name_to_template_path[_name_key] = _doc.template_path
-        except Exception:
-          pass
-        
-        log(f"✅ Created document object: {doc_obj.name} -> {filename}")
+          if getattr(_doc, 'template_path', None):
+            offering_document_files_by_filename[_doc.template_path] = _doc
+        except Exception as _re:
+          log(f"⚠️ Reverse mapping warning: {_re}")
       
-      log(f"📄 Document loading complete. Created {len(offering_document_files_list)} objects for template iteration")
+      log(f"✅ Created {len(offering_document_files_list)} image objects for offering inserts")
+      
+      log(f"📄 Image loading complete. Created {len(offering_document_files_list)} objects for template iteration")
       
       # Debug: Log the actual objects for troubleshooting
       # This helps verify that objects are created correctly with proper attributes
       for i, doc_obj in enumerate(offering_document_files_list):
-        log(f"📄 Document {i+1}: name='{doc_obj.name}', template_path='{doc_obj.template_path}', filename='{doc_obj.filename}'")
+        log(f"📄 Image {i+1}: name='{doc_obj.name}', template_path='{doc_obj.template_path}', filename='{doc_obj.filename}', width='{doc_obj.width}'")
       
       # Define variables globally for template access
       define('offering_document_files', offering_document_files)
       define('offering_document_files_list', offering_document_files_list)
       
       # Define variables globally for template access
+      define('offering_name_to_dafile', offering_name_to_dafile)
       define('offering_name_to_template_path', offering_name_to_template_path)
+      define('offering_document_files_by_filename', offering_document_files_by_filename)
       
       # Mark as loaded to prevent duplicate processing
       offering_document_content_loaded = True
       document_loader_complete = True
       
     except Exception as e:
-      log(f"❌ Critical error in document loading: {str(e)}")
+      log(f"❌ Critical error in image loading: {str(e)}")
       # Set empty structures if loading fails - graceful degradation
       offering_document_files = {}
       offering_document_files_list = []
-      offering_name_to_template_path = {}
+      offering_name_to_dafile = {}
       # Define empty variables globally even on error
-      define('offering_name_to_template_path', offering_name_to_template_path)
+      define('offering_name_to_dafile', offering_name_to_dafile)
       # Define empty variables globally even on error
       define('offering_document_files', offering_document_files)
       define('offering_document_files_list', offering_document_files_list)

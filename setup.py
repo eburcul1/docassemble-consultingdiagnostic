@@ -44,9 +44,9 @@ def find_package_data(where='.', package='', exclude=standard_exclude, exclude_d
     return out
 
 setup(name='docassemble.consultingdiagnostic',
-      version='0.1.0',
-      description=('Update word doc, correct deft in top 3 offers selection'),
-      long_description='launch from main_interview.yml\r\nrequires an OpenAI key in config file for AI gen\r\nIntroduces assessment_intelligence_agent (uses AI to show category help) \r\nIntroduces new prioritization screen for pain points. Only top 3 are considered for ouput.\r\n0.0.5 corrected video playback on VPS\r\n0.0.6 correct selection of top 3 offerings\r\n0.0.7 update main_interview to enable response and recommended next actions in the Word output file\r\n0.0.8 slight modifications to enable tracking of token usage for help and for response creation\r\n0.0.9 favicon files included in static directory (unable to test this in Docker playground - need to deply to prduction to test. Note config file needs to be updates to enable favicon to work)\r\n0.1.0 correct defect on selection of top 3 offereings. Update Word template (formatting still needs work)',
+      version='0.1.1',
+      description=('Update word doc, convert offering inserts into PNG to maintain formatting'),
+      long_description='launch from main_interview.yml\r\nrequires an OpenAI key in config file for AI gen\r\nIntroduces assessment_intelligence_agent (uses AI to show category help) \r\nIntroduces new prioritization screen for pain points. Only top 3 are considered for ouput.\r\n0.0.5 corrected video playback on VPS\r\n0.0.6 correct selection of top 3 offerings\r\n0.0.7 update main_interview to enable response and recommended next actions in the Word output file\r\n0.0.8 slight modifications to enable tracking of token usage for help and for response creation\r\n0.0.9 favicon files included in static directory (unable to test this in Docker playground - need to deply to prduction to test. Note config file needs to be updates to enable favicon to work)\r\n0.1.0 correct defect on selection of top 3 offereings. Update Word template (formatting still needs work)\r\n0.1.1 convert top 3 selection to PNG, refresh Word document formatting',
       long_description_content_type='text/markdown',
       author='System Administrator',
       author_email='burcul_elvis@hotmail.com',

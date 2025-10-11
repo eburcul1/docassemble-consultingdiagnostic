@@ -8,3 +8,4 @@ Introduces new prioritization screen for pain points. Only top 3 are considered 
 0.0.8 slight modifications to enable tracking of token usage for help and for response creation
 0.0.9 favicon files included in static directory (unable to test this in Docker playground - need to deply to prduction to test. Note config file needs to be updates to enable favicon to work)
 0.1.0 correct defect on selection of top 3 offereings. Update Word template (formatting still needs work)
+0.1.1 convert top 3 selection to PNG, refresh Word document formatting

@@ -2,7 +2,7 @@
 metadata:
   title: Consulting Services Diagnostic
   short title: 
-  version: "0.1.0"
+  version: "0.1.1"
   description: |
     Complete diagnostic system for consulting services.
     
@@ -865,7 +865,6 @@ code: |
         log("✅ Reordered offering_document_files_list to match top_three_offerings order")
         for i, _d in enumerate(offering_document_files_list[:5]):
           log(f"    ORDER {i+1}: {_d.name} -> {_d.template_path}")
-
         # Note: top_three_template_paths will be built after AI results are merged
     except Exception as _order_err:
       log(f"⚠️ Failed to reorder offering_document_files_list: {_order_err}")

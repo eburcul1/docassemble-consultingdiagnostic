@@ -251,6 +251,12 @@ code: |
         log("🚀 IMMEDIATE: Launching AI background task as soon as questions complete")
         try:
           from docassemble.base.util import background_action
+          # Ensure configuration (including 'defaults' and industry_averages) is loaded
+          try:
+            need('load_configuration_constants')
+            need('scoring_config')
+          except Exception as _cfg_err:
+            log(f"⚠️ IMMEDIATE: Config pre-load warning: {_cfg_err}")
           
           # Prepare assessment data for background task
           assessment_data_for_ai = {
@@ -280,6 +286,12 @@ code: |
         log("🚀 IMMEDIATE: Launching AI background task as soon as questions complete (by index)")
         try:
           from docassemble.base.util import background_action
+          # Ensure configuration (including 'defaults' and industry_averages) is loaded
+          try:
+            need('load_configuration_constants')
+            need('scoring_config')
+          except Exception as _cfg_err:
+            log(f"⚠️ IMMEDIATE: Config pre-load warning: {_cfg_err}")
           
           # Prepare assessment data for background task
           assessment_data_for_ai = {
@@ -596,6 +608,19 @@ code: |
             # Always define the variable, even if empty
             define('top_three_template_paths', top_three_template_paths)
             log(f"🔍 Final top_three_template_paths: {top_three_template_paths}")
+
+            # Build DAFile objects list corresponding to top_three_template_paths for .show() usage in DOCX
+            try:
+              top_three_dafiles = []
+              if defined('offering_document_files_by_filename') and isinstance(offering_document_files_by_filename, dict):
+                for _tpl in top_three_template_paths:
+                  _df = offering_document_files_by_filename.get(_tpl)
+                  if _df:
+                    top_three_dafiles.append(_df)
+              define('top_three_dafiles', top_three_dafiles)
+              log(f"✅ Built top_three_dafiles: {len(top_three_dafiles)} items")
+            except Exception as _daf_err:
+              log(f"⚠️ Failed building top_three_dafiles: {_daf_err}")
           # Merge token usage data
           if 'total_prompt_tokens' in _ai_result:
             total_prompt_tokens = _ai_result.get('total_prompt_tokens')
@@ -631,6 +656,9 @@ code: |
           # Set AI processing complete flag when all results are successfully merged
           ai_processing_complete = True
           define('ai_processing_complete', True)
+          # Signal that AI content is ready for templates
+          ai_content_ready = True
+          define('ai_content_ready', True)
           log("✅ AI processing complete flag set to True")
         except Exception as _merge_err:
           log(f"⚠️ Error merging AI results: {_merge_err}")

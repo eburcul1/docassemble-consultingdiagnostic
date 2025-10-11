@@ -6,8 +6,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docassemble.consultingdiagnostic"
-version = "0.1.0"
-description = "Update word doc, correct deft in top 3 offers selection"
+version = "0.1.1"
+description = "Update word doc, convert offering inserts into PNG to maintain formatting"
 readme = "README.md"
 authors = [
     { name = "System Administrator", email = "burcul_elvis@hotmail.com" },
